@@ -1,0 +1,12 @@
+{
+  "name": "awcell",
+  "private": true,
+  "description": "awCELL: yalnız madematik.com'a yayın betiği için; uygulamanın kendisi bağımlılık kullanmaz",
+  "scripts": {
+    "deploy": "node scripts/deploy-ftp.mjs"
+  },
+  "devDependencies": {
+    "basic-ftp": "^6.2.3",
+    "dotenv": "^17.4.2"
+  }
+}
