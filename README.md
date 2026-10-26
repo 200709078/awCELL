@@ -48,7 +48,7 @@ Sonra tarayıcıda `http://localhost:8080` adresini açın.
 
 ## Yayınlama
 
-Canlı adres: [madematik.com/public/awCELL](https://madematik.com/public/awCELL/). Uygulama dosyaları
+Canlı adres: [madematik.com/awCELL/](https://madematik.com/awCELL/). Uygulama dosyaları
 (`index.html`, `app.js`, `style.css`, `icons/`, `vendor/`) FTP ile yüklenir:
 
 ```bash
