@@ -2,7 +2,7 @@
 
 Tarayıcıda çalışan, kurulum gerektirmeyen, çevrimdışı çalışabilen elektronik tablo (spreadsheet) uygulaması.
 
-made by **mADEMatik** — [madematik.com](https://www.madematik.com)
+**mADEMatik Solutions** — [madematik.com](https://www.madematik.com)
 
 ## Özellikler
 
