@@ -38,8 +38,19 @@ test("dört işlem, öncelik, üs ve yüzde", () => {
     assert.equal(value("=50%*10"), "5");
     assert.equal(value("=0.1+0.2"), "0.3");
     assert.equal(value("=1/0"), "#SAYI/0!");
-    assert.equal(value('="a"&1,5'), "#AD?");
+    assert.equal(value('="a"&1,5'), "a1,5");
     assert.equal(value('="a"&1.5'), "a1,5");
+});
+
+test("formülde virgüllü ondalık (Türkçe Excel yazımı)", () => {
+    const cells = { A1: "4" };
+    assert.equal(value("=A1*0,5", cells), "2");
+    assert.equal(value("=TOPLA(1;2,5)"), "3.5");
+    assert.equal(value("=YUVARLA(2,345;2)"), "2.35");
+    assert.equal(value("=ROUND(2.345,2)"), "2.35");
+    assert.equal(value("=SUM(1,5)"), "6");
+    assert.equal(value('=EĞER(A1>3,5;"büyük";"küçük")', cells), "büyük");
+    assert.equal(F.translateFormula("=YUVARLA(2,345;2)", { format: "excel" }), "ROUND(2.345,2)");
 });
 
 test("başvurular, Türkçe ondalık ve metin", () => {

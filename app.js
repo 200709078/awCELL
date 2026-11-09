@@ -6009,8 +6009,8 @@ function showFunctionHelp() {
     const lines = FUNCTION_HELP.map(([name, example, description]) => `${name}\n   ${example}  —  ${description}`);
     showAppDialog({
         title: "Formüller",
-        message: "Formül = ile başlar. Bağımsız değişkenler ; ya da , ile ayrılır. "
-            + "Türkçe ve İngilizce adlar birlikte geçer. Formül yazarken bir hücreye tıklamak başvurusunu ekler.\n\n"
+        message: "Formül = ile başlar. Türkçe Excel'deki gibi ; ile ayırıp ondalıkta virgül kullanın: =YUVARLA(2,345;2). "
+            + "İngilizce yazım da geçer: =ROUND(2.345,2). Formül yazarken bir hücreye tıklamak başvurusunu ekler.\n\n"
             + lines.join("\n")
     });
 }

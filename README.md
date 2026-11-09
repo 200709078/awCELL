@@ -9,7 +9,8 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
 
 - **Formüller**: güvenli, kendi ayrıştırıcısı olan formül motoru (JavaScript kodu çalıştırmaz).
   Türkçe Excel adları ve İngilizce adlar birlikte geçer (`=TOPLA(A1:A5)` = `=SUM(A1:A5)`);
-  bağımsız değişken ayırıcısı `;` ya da `,`. Başka sayfaya başvuru: `='Not Listesi'!B4`.
+  Türkçe Excel yazımı (`;` ayırıcı, ondalık virgül: `=YUVARLA(2,345;2)`, `=A1*0,5`) ve İngilizce
+  yazım (`=ROUND(2.345,2)`) ikisi de geçer. Başka sayfaya başvuru: `='Not Listesi'!B4`.
   Formül yazarken bir hücreye tıklamak (sürüklemek) başvurusunu ekler.
 - **İşlevler**: TOPLA, ORTALAMA, MİN, MAK, BAĞ_DEĞ_SAY, BAĞ_DEĞ_DOLU_SAY, BOŞLUKSAY, ÇARPIM, ORTANCA,
   STDSAPMA, BÜYÜK, KÜÇÜK, RANK, EĞER, EĞERHATA, VE, YADA, DEĞİL, EĞERSAY, ETOPLA, EĞERORTALAMA,

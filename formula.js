@@ -202,9 +202,21 @@
         return null;
     }
 
+    /** Tırnak dışında ";" var mı? Varsa formül Türkçe Excel yazımındadır: "," ondalık ayırıcıdır. */
+    function usesSemicolonSeparator(source) {
+        let quoted = false;
+        for (const char of source) {
+            if (char === '"') quoted = !quoted;
+            else if (char === ";" && !quoted) return true;
+        }
+        return false;
+    }
+
     function tokenize(source) {
         const tokens = [];
         let index = 0;
+        let depth = 0;
+        const semicolonMode = usesSemicolonSeparator(source);
 
         while (index < source.length) {
             const char = source[index];
@@ -265,8 +277,14 @@
 
             const numberMatch = rest.match(NUMBER_TOKEN_RE);
             if (numberMatch) {
-                index += numberMatch[0].length;
-                tokens.push({ type: "num", value: Number(numberMatch[0]), start, end: index });
+                let text = numberMatch[0];
+                // "2,5": ";" kullanan formülde ya da işlev dışında virgül ondalıktır (=A1*0,5).
+                const decimalMatch = /^\d+$/.test(text) && (semicolonMode || depth === 0)
+                    ? rest.slice(text.length).match(/^,(\d+)(?:[eE][+-]?\d+)?/)
+                    : null;
+                if (decimalMatch) text += decimalMatch[0];
+                index += text.length;
+                tokens.push({ type: "num", value: Number(text.replace(",", ".")), start, end: index });
                 continue;
             }
 
@@ -281,10 +299,12 @@
             }
 
             if (char === "(") {
+                depth++;
                 tokens.push({ type: "lparen", start, end: ++index });
                 continue;
             }
             if (char === ")") {
+                depth = Math.max(0, depth - 1);
                 tokens.push({ type: "rparen", start, end: ++index });
                 continue;
             }
@@ -1466,6 +1486,9 @@
                     break;
                 case "str":
                     output += `"${token.value.replace(/"/g, '""')}"`;
+                    break;
+                case "num":
+                    output += String(token.value);
                     break;
                 default:
                     output += body.slice(token.start, token.end);
