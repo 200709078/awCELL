@@ -1,8 +1,9 @@
 {
   "name": "awcell",
   "private": true,
-  "description": "awCELL: yalnız madematik.com'a yayın betiği için; uygulamanın kendisi bağımlılık kullanmaz",
+  "description": "awCELL: test ve yayın betikleri için; uygulamanın kendisi bağımlılık kullanmaz",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "deploy": "node scripts/deploy-ftp.mjs"
   },
   "devDependencies": {

@@ -33,6 +33,7 @@ const openFileBtn = document.getElementById("open-file-btn");
 const openFileInput = document.getElementById("open-file-input");
 const saveFileBtn = document.getElementById("save-file-btn");
 const saveAsFileBtn = document.getElementById("save-as-file-btn");
+const printFileBtn = document.getElementById("print-file-btn");
 const editMenuBtn = document.getElementById("edit-menu-btn");
 const editMenu = document.getElementById("edit-menu");
 const menuUndoBtn = document.getElementById("menu-undo-btn");
@@ -66,6 +67,8 @@ const showAxisBtn = document.getElementById("show-axis-btn");
 const freezeAxisBtn = document.getElementById("freeze-axis-btn");
 const formatMenuBtn = document.getElementById("format-menu-btn");
 const formatMenu = document.getElementById("format-menu");
+const helpMenuBtn = document.getElementById("help-menu-btn");
+const helpMenu = document.getElementById("help-menu");
 const menuBoldBtn = document.getElementById("menu-bold-btn");
 const menuItalicBtn = document.getElementById("menu-italic-btn");
 const menuUnderlineBtn = document.getElementById("menu-underline-btn");
@@ -176,6 +179,10 @@ const SAVE_AS_FILE_TYPES = [
     {
         description: "PDF dosyası",
         accept: { "application/pdf": [".pdf"] }
+    },
+    {
+        description: "CSV (yalnız etkin sayfa)",
+        accept: { "text/csv": [".csv"] }
     }
 ];
 let rowCount = 100;
@@ -209,6 +216,7 @@ let mouseSelectionMoved = false;
 let headerSelectionState = null;
 let moveSelectionState = null;
 let suppressClickAfterMove = false;
+let suppressClickAfterPoint = false;
 let resizeState = null;
 let freezeDragState = null;
 let undoStack = [];
@@ -218,6 +226,9 @@ let isAppInitialized = false;
 let isLoadingWorkbook = false;
 let autoSaveTimer = null;
 let isEditing = false;
+// "enter": hücreye yazarak girildi, oklar hücreden çıkar; "edit": F2/çift tık, oklar imleci taşır.
+let editMode = "enter";
+let formulaPointState = null;
 let editBackupValue = "";
 let formulaInputBackupValue = "";
 let activeFilter = null;
@@ -237,7 +248,6 @@ const COLOR_PALETTE = [
     "#f4cccc", "#fce5cd", "#fff2cc", "#d9ead3", "#d0e0e3", "#cfe2f3",
     "#c9daf8", "#d9d2e9", "#ead1dc", "#efefef", "#b7b7b7", "#202124"
 ];
-
 
 function normalizeSelectedCell() {
     if (!selectedCell) return;
@@ -265,46 +275,21 @@ function getCellName(row, col) {
     return `${getColumnLabel(col)}${row + 1}`;
 }
 
-function parseFormulaReference(ref) {
-    const match = String(ref).match(/^(\$?)([A-Z]+)(\$?)(\d+)$/i);
-    if (!match) return null;
-
-    const [, colAbsolute, colLetters, rowAbsolute, rowNumber] = match;
-    const index = cellRefToIndex(`${colLetters}${rowNumber}`.toUpperCase());
-    if (!index) return null;
-
-    return {
-        colAbsolute: Boolean(colAbsolute),
-        rowAbsolute: Boolean(rowAbsolute),
-        row: index.row,
-        col: index.col
-    };
+function shiftReferencePoint(point, rowOffset, colOffset) {
+    if (point.row !== undefined && !point.rowAbs) point.row += rowOffset;
+    if (point.col !== undefined && !point.colAbs) point.col += colOffset;
+    return !(point.row < 0 || point.col < 0);
 }
 
-function formatFormulaReference(ref) {
-    return `${ref.colAbsolute ? "$" : ""}${getColumnLabel(ref.col)}${ref.rowAbsolute ? "$" : ""}${ref.row + 1}`;
-}
-
-function adjustFormulaReference(ref, rowOffset, colOffset) {
-    const parsedRef = parseFormulaReference(ref);
-    if (!parsedRef) return ref;
-
-    const nextRef = {
-        ...parsedRef,
-        row: parsedRef.rowAbsolute ? parsedRef.row : parsedRef.row + rowOffset,
-        col: parsedRef.colAbsolute ? parsedRef.col : parsedRef.col + colOffset
-    };
-
-    if (nextRef.row < 0 || nextRef.col < 0) return "#REF!";
-    return formatFormulaReference(nextRef);
-}
-
+/** Kopyalama/taşımada göreli başvuruları kaydırır; tabloya düşmeyen başvuru #REF! olur. */
 function adjustFormulaReferences(formula, rowOffset, colOffset) {
     if (!formula || (!rowOffset && !colOffset)) return formula;
 
-    return formula.replace(/(^|[^A-Z0-9_])(\$?[A-Z]+\$?\d+)/gi, (match, prefix, ref) => (
-        `${prefix}${adjustFormulaReference(ref, rowOffset, colOffset)}`
-    ));
+    return AwFormula.mapReferences(formula, (ref) => {
+        if (!shiftReferencePoint(ref.a, rowOffset, colOffset)) return null;
+        if (ref.b && !shiftReferencePoint(ref.b, rowOffset, colOffset)) return null;
+        return ref;
+    });
 }
 
 function countIndexesBefore(indexes, position) {
@@ -314,37 +299,6 @@ function countIndexesBefore(indexes, position) {
 function mapDeletedAxisPosition(position, deletedIndexes) {
     if (deletedIndexes.includes(position)) return null;
     return position - countIndexesBefore(deletedIndexes, position);
-}
-
-function adjustCellReferenceForGridChange(ref, change) {
-    const parsedRef = parseFormulaReference(ref);
-    if (!parsedRef) return ref;
-
-    const nextRef = { ...parsedRef };
-
-    if (change.mode === "insert") {
-        if (change.axis === "row" && parsedRef.row >= change.index) {
-            nextRef.row += change.count;
-        }
-        if (change.axis === "column" && parsedRef.col >= change.index) {
-            nextRef.col += change.count;
-        }
-        return formatFormulaReference(nextRef);
-    }
-
-    const deletedIndexes = change.indexes ?? [];
-    if (change.axis === "row") {
-        const mappedRow = mapDeletedAxisPosition(parsedRef.row, deletedIndexes);
-        if (mappedRow === null) return "#REF!";
-        nextRef.row = mappedRow;
-    }
-    if (change.axis === "column") {
-        const mappedCol = mapDeletedAxisPosition(parsedRef.col, deletedIndexes);
-        if (mappedCol === null) return "#REF!";
-        nextRef.col = mappedCol;
-    }
-
-    return formatFormulaReference(nextRef);
 }
 
 function getRemainingAxisBounds(minPosition, maxPosition, deletedIndexes) {
@@ -362,98 +316,145 @@ function getRemainingAxisBounds(minPosition, maxPosition, deletedIndexes) {
     };
 }
 
-function adjustFormulaRangeForGridChange(startRef, endRef, change) {
-    const start = parseFormulaReference(startRef);
-    const end = parseFormulaReference(endRef);
-    if (!start || !end) return `${startRef}:${endRef}`;
-
-    const nextStart = { ...start };
-    const nextEnd = { ...end };
+/**
+ * Satır/sütun ekleme-silmede bir başvuruyu günceller.
+ * change: { mode: "insert", axis: "row" | "column", index, count } ya da
+ *         { mode: "delete", axis, indexes: artan sırada }
+ */
+function adjustReferenceForGridChange(ref, change) {
+    const key = change.axis === "row" ? "row" : "col";
+    const points = ref.b ? [ref.a, ref.b] : [ref.a];
+    if (points[0][key] === undefined) return ref;
 
     if (change.mode === "insert") {
-        if (change.axis === "row") {
-            if (nextStart.row >= change.index) nextStart.row += change.count;
-            if (nextEnd.row >= change.index) nextEnd.row += change.count;
-        }
-        if (change.axis === "column") {
-            if (nextStart.col >= change.index) nextStart.col += change.count;
-            if (nextEnd.col >= change.index) nextEnd.col += change.count;
-        }
-
-        return `${formatFormulaReference(nextStart)}:${formatFormulaReference(nextEnd)}`;
+        points.forEach((point) => {
+            if (point[key] >= change.index) point[key] += change.count;
+        });
+        return ref;
     }
 
     const deletedIndexes = change.indexes ?? [];
-
-    if (change.axis === "row") {
-        const minRow = Math.min(start.row, end.row);
-        const maxRow = Math.max(start.row, end.row);
-        const remainingRows = getRemainingAxisBounds(minRow, maxRow, deletedIndexes);
-        if (!remainingRows) return "#REF!";
-
-        if (start.row <= end.row) {
-            nextStart.row = remainingRows.min;
-            nextEnd.row = remainingRows.max;
-        } else {
-            nextStart.row = remainingRows.max;
-            nextEnd.row = remainingRows.min;
-        }
-
-        nextStart.col = mapDeletedAxisPosition(start.col, []);
-        nextEnd.col = mapDeletedAxisPosition(end.col, []);
+    if (!ref.b) {
+        const mapped = mapDeletedAxisPosition(ref.a[key], deletedIndexes);
+        if (mapped === null) return null;
+        ref.a[key] = mapped;
+        return ref;
     }
 
-    if (change.axis === "column") {
-        const minCol = Math.min(start.col, end.col);
-        const maxCol = Math.max(start.col, end.col);
-        const remainingCols = getRemainingAxisBounds(minCol, maxCol, deletedIndexes);
-        if (!remainingCols) return "#REF!";
-
-        if (start.col <= end.col) {
-            nextStart.col = remainingCols.min;
-            nextEnd.col = remainingCols.max;
-        } else {
-            nextStart.col = remainingCols.max;
-            nextEnd.col = remainingCols.min;
-        }
-    }
-
-    return `${formatFormulaReference(nextStart)}:${formatFormulaReference(nextEnd)}`;
-}
-
-function adjustFormulaForGridChange(formula, change) {
-    if (!formula) return formula;
-
-    const rangePlaceholders = [];
-    let nextFormula = formula.replace(
-        /(\$?[A-Z]+\$?\d+):(\$?[A-Z]+\$?\d+)/gi,
-        (match, startRef, endRef) => {
-            const placeholder = `@@AWCELL_RANGE_${rangePlaceholders.length}@@`;
-            rangePlaceholders.push(adjustFormulaRangeForGridChange(startRef, endRef, change));
-            return placeholder;
-        }
+    const isAscending = ref.a[key] <= ref.b[key];
+    const remaining = getRemainingAxisBounds(
+        Math.min(ref.a[key], ref.b[key]),
+        Math.max(ref.a[key], ref.b[key]),
+        deletedIndexes
     );
-
-    nextFormula = nextFormula.replace(/(^|[^A-Z0-9_])(\$?[A-Z]+\$?\d+)/gi, (match, prefix, ref) => (
-        `${prefix}${adjustCellReferenceForGridChange(ref, change)}`
-    ));
-
-    rangePlaceholders.forEach((range, index) => {
-        nextFormula = nextFormula.replace(`@@AWCELL_RANGE_${index}@@`, range);
-    });
-
-    return nextFormula;
+    if (!remaining) return null;
+    ref.a[key] = isAscending ? remaining.min : remaining.max;
+    ref.b[key] = isAscending ? remaining.max : remaining.min;
+    return ref;
 }
 
+function isSameSheetName(a, b) {
+    return String(a ?? "").toLocaleLowerCase("tr-TR") === String(b ?? "").toLocaleLowerCase("tr-TR");
+}
+
+function getSheetTableData(sheetIndex) {
+    return sheetIndex === activeSheetIndex ? tableData : sheets[sheetIndex]?.tableData;
+}
+
+function forEachWorkbookFormulaCell(callback) {
+    const sheetTotal = Math.max(1, sheets.length);
+    for (let sheetIndex = 0; sheetIndex < sheetTotal; sheetIndex++) {
+        const data = getSheetTableData(sheetIndex);
+        if (!data) continue;
+        data.forEach((row, rowIndex) => {
+            row?.forEach((cell, colIndex) => {
+                if (cell?.formula) callback(cell, sheetIndex, rowIndex, colIndex);
+            });
+        });
+    }
+}
+
+/** Etkin sayfadaki ekleme/silmeyi, o sayfaya başvuran bütün formüllere (diğer sayfalar dahil) yansıtır. */
 function adjustAllFormulasForGridChange(change) {
-    for (let r = 0; r < rowCount; r++) {
-        for (let c = 0; c < colCount; c++) {
-            const cell = tableData[r]?.[c];
-            if (cell?.formula) {
-                cell.formula = adjustFormulaForGridChange(cell.formula, change);
+    const activeName = sheets[activeSheetIndex]?.name;
+
+    forEachWorkbookFormulaCell((cell, sheetIndex) => {
+        cell.formula = AwFormula.mapReferences(cell.formula, (ref) => {
+            const pointsToActiveSheet = ref.sheet === null
+                ? sheetIndex === activeSheetIndex
+                : isSameSheetName(ref.sheet, activeName);
+            return pointsToActiveSheet ? adjustReferenceForGridChange(ref, change) : ref;
+        });
+    });
+    adjustChartRangesForGridChange(change);
+}
+
+function chartRangeToReference(range) {
+    return {
+        sheet: null,
+        kind: "range",
+        a: { row: range.start.row, col: range.start.col, rowAbs: false, colAbs: false },
+        b: { row: range.end.row, col: range.end.col, rowAbs: false, colAbs: false }
+    };
+}
+
+function adjustChartRangeForGridChange(range, change) {
+    if (!range) return null;
+    if (Array.isArray(range)) {
+        const adjusted = range.map((item) => adjustChartRangeForGridChange(item, change));
+        return adjusted.some((item) => !item) ? null : adjusted;
+    }
+
+    const ref = adjustReferenceForGridChange(chartRangeToReference(range), change);
+    if (!ref) return null;
+    return {
+        start: { row: ref.a.row, col: ref.a.col },
+        end: { row: ref.b.row, col: ref.b.col }
+    };
+}
+
+/** Grafiklerin veri/etiket aralıkları ve başlık başvurusu da satır/sütun değişikliğini izler. */
+function adjustChartRangesForGridChange(change) {
+    charts.forEach((chart) => {
+        if (chart.titleReference) {
+            const ref = adjustReferenceForGridChange({
+                sheet: null,
+                kind: "cell",
+                a: { row: chart.titleReference.row, col: chart.titleReference.col }
+            }, change);
+            chart.titleReference = ref ? { row: ref.a.row, col: ref.a.col } : null;
+            if (chart.settings?.titleText && ref) {
+                chart.settings.titleText = getCellName(ref.a.row, ref.a.col);
             }
         }
-    }
+
+        if (!chart.config) return;
+        const xRange = chart.config.xRange ? adjustChartRangeForGridChange(chart.config.xRange, change) : null;
+        const yRange = adjustChartRangeForGridChange(chart.config.yRange, change);
+        if (!yRange || (chart.config.xRange && !xRange)) {
+            chart.config = null;
+            showEmptyChartPanel(chart);
+            return;
+        }
+        chart.config.xRange = xRange;
+        chart.config.yRange = yRange;
+        chart.settings = {
+            ...(chart.settings ?? {}),
+            labelRangeText: formatChartRange(xRange),
+            valueRangeText: formatChartRange(yRange)
+        };
+    });
+    if (activeChart) updateChartSettingsPanel();
+}
+
+/** Sayfa adı değişince ona başvuran formüller de yeni adı kullanır. */
+function renameSheetReferences(oldName, newName) {
+    forEachWorkbookFormulaCell((cell) => {
+        cell.formula = AwFormula.mapReferences(cell.formula, (ref) => {
+            if (ref.sheet !== null && isSameSheetName(ref.sheet, oldName)) ref.sheet = newName;
+            return ref;
+        });
+    });
 }
 
 function getCellEditValue(row, col) {
@@ -584,7 +585,7 @@ function updateEditMenuState() {
     if (menuRedoBtn) menuRedoBtn.disabled = redoStack.length === 0;
     if (menuCutBtn) menuCutBtn.disabled = !canUseSelection;
     if (menuCopyBtn) menuCopyBtn.disabled = !canUseSelection;
-    if (menuPasteBtn) menuPasteBtn.disabled = !canUseSelection || !internalClipboard;
+    if (menuPasteBtn) menuPasteBtn.disabled = !canUseSelection;
     if (menuDeleteBtn) menuDeleteBtn.disabled = false;
     editMenu?.querySelectorAll("[data-delete-action]").forEach((button) => {
         const action = button.dataset.deleteAction;
@@ -614,8 +615,11 @@ function normalizeZoom(value) {
     ), 100);
 }
 
+let currentZoom = null;
+
 function getCurrentZoom() {
-    return normalizeZoom(loadViewSettings().zoom);
+    if (currentZoom === null) currentZoom = normalizeZoom(loadViewSettings().zoom);
+    return currentZoom;
 }
 
 function getZoomScale() {
@@ -626,7 +630,7 @@ function loadViewSettings() {
     try {
         return {
             ...getDefaultViewSettings(),
-            ...JSON.parse(localStorage.getItem(VIEW_SETTINGS_KEY) || "{}")
+            ...JSON.parse(safeStorageGet(VIEW_SETTINGS_KEY) || "{}")
         };
     } catch {
         return getDefaultViewSettings();
@@ -634,7 +638,11 @@ function loadViewSettings() {
 }
 
 function saveViewSettings(settings) {
-    localStorage.setItem(VIEW_SETTINGS_KEY, JSON.stringify(settings));
+    try {
+        localStorage.setItem(VIEW_SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+        // Depolama kapalıysa ayar yalnız bu oturumda geçerli olur.
+    }
 }
 
 function updateViewMenuState(settings = loadViewSettings()) {
@@ -662,6 +670,7 @@ function applyViewSettings(settings = loadViewSettings(), shouldSave = false) {
     document.body.classList.toggle("formula-hidden", !settings.formulaBar);
     document.body.classList.toggle("gridlines-hidden", !settings.gridlines);
     settings.zoom = normalizeZoom(settings.zoom);
+    currentZoom = settings.zoom;
     updateViewMenuState(settings);
 
     if (shouldSave) {
@@ -739,10 +748,11 @@ function updateInsertMenuState() {
 }
 
 function canSortActiveRange() {
-    const range = getActiveRange();
-    if (!range || isEditing) return false;
+    if (isEditing) return false;
+    if (selectionMode === "column") return getSelectedColumnIndexes().length === 1;
 
-    return range.maxRow > range.minRow && range.maxCol >= range.minCol;
+    const range = getActiveRange();
+    return Boolean(range) && range.maxRow > range.minRow && range.maxCol >= range.minCol;
 }
 
 function updateDataMenuState() {
@@ -864,6 +874,7 @@ function updateTextMenuActiveState() {
     insertMenuBtn?.classList.toggle("active", Boolean(insertMenu && !insertMenu.hidden));
     dataMenuBtn?.classList.toggle("active", Boolean(dataMenu && !dataMenu.hidden));
     formatMenuBtn?.classList.toggle("active", Boolean(formatMenu && !formatMenu.hidden));
+    helpMenuBtn?.classList.toggle("active", Boolean(helpMenu && !helpMenu.hidden));
 }
 
 function hasOpenTextMenu() {
@@ -873,11 +884,16 @@ function hasOpenTextMenu() {
         (viewMenu && !viewMenu.hidden) ||
         (insertMenu && !insertMenu.hidden) ||
         (dataMenu && !dataMenu.hidden) ||
-        (formatMenu && !formatMenu.hidden)
+        (formatMenu && !formatMenu.hidden) ||
+        (helpMenu && !helpMenu.hidden)
     );
 }
 
+let textMenuOpenedAt = 0;
+
 function openTextMenu(menuName) {
+    textMenuOpenedAt = performance.now();
+    hideHelpMenu();
     hideFileMenu();
     hideEditMenu();
     hideViewMenu();
@@ -907,6 +923,7 @@ function openTextMenu(menuName) {
         updateDataMenuState();
         dataMenu.hidden = false;
     }
+    if (menuName === "help" && helpMenu) helpMenu.hidden = false;
     if (menuName === "format" && formatMenu) {
         updateFormatMenuState();
         formatMenu.hidden = false;
@@ -953,6 +970,13 @@ function hideFormatMenu() {
     if (!formatMenu) return;
 
     formatMenu.hidden = true;
+    updateTextMenuActiveState();
+}
+
+function hideHelpMenu() {
+    if (!helpMenu) return;
+
+    helpMenu.hidden = true;
     updateTextMenuActiveState();
 }
 
@@ -1065,7 +1089,7 @@ function clearClipboardState(shouldRender = false, shouldFocus = true) {
     clipboardMode = null;
 
     if (shouldRender) {
-        renderTable();
+        renderSelection();
         if (shouldFocus) {
             focusSelectedCell();
         }
@@ -1106,12 +1130,13 @@ function updateContextMenuState() {
         "rename-sheet": isSheetContext,
         "delete-sheet": isSheetContext,
         clear: isSelectionContext,
-        note: isCellContext
+        note: isCellContext,
+        "delete-note": isCellContext && selectionHasNote()
     };
     const stateByAction = {
         cut: hasSelection,
         copy: hasSelection,
-        paste: hasSelection && Boolean(internalClipboard),
+        paste: hasSelection,
         "insert-row-above": isRowContext,
         "insert-row-below": isRowContext,
         "delete-row": isRowContext && rowDeleteCount > 0,
@@ -1126,7 +1151,8 @@ function updateContextMenuState() {
         "rename-sheet": isSheetContext,
         "delete-sheet": isSheetContext && sheets.length > 1,
         clear: hasSelection && hasClearableContent(),
-        note: hasSelection
+        note: hasSelection,
+        "delete-note": hasSelection
     };
 
     contextMenu.querySelectorAll("[data-action]").forEach((button) => {
@@ -1155,6 +1181,18 @@ function updateContextMenuState() {
     setContextMenuLabel("insert-col-left", `Sola ${selectedColCount} sütun ekle`);
     setContextMenuLabel("insert-col-right", `Sağa ${selectedColCount} sütun ekle`);
     setContextMenuLabel("delete-col", `${selectedColCount} sütun sil`);
+    setContextMenuLabel("note", selectedCell && tableData[selectedCell.row]?.[selectedCell.col]?.note ? "Notu düzenle" : "Not ekle");
+}
+
+function selectionHasNote() {
+    return getActiveRanges().some((range) => {
+        for (let r = range.minRow; r <= range.maxRow; r++) {
+            for (let c = range.minCol; c <= range.maxCol; c++) {
+                if (tableData[r]?.[c]?.note) return true;
+            }
+        }
+        return false;
+    });
 }
 
 function updateContextMenuSeparators() {
@@ -1318,14 +1356,13 @@ function getSelectionSummary() {
                 const cell = tableData[r]?.[c];
                 if (!cell) continue;
 
-                const rawValue = cell.formula ? cell.value : cell.value;
-                const text = String(rawValue ?? "").trim();
+                const text = String(cell.value ?? "").trim();
                 if (text !== "") {
                     count++;
                 }
 
-                const numericValue = Number(text);
-                if (text !== "" && Number.isFinite(numericValue)) {
+                const numericValue = parseCellNumber(text);
+                if (numericValue !== null && !AwFormula.isErrorText(text)) {
                     numberCount++;
                     sum += numericValue;
                 }
@@ -1413,13 +1450,9 @@ function setClipboardFromSelection(mode = "copy") {
         end: { row: range.maxRow, col: range.maxCol }
     };
     clipboardMode = mode;
-    renderTable();
+    renderSelection();
     focusSelectedCell();
     return true;
-}
-
-function copySelection() {
-    return setClipboardFromSelection("copy");
 }
 
 function pasteClipboard() {
@@ -1441,6 +1474,7 @@ function pasteClipboard() {
         minCol: startCol,
         maxCol: requiredCols - 1
     };
+    clearMergesIntersectingRange(targetRange);
 
     for (let r = 0; r < internalClipboard.length; r++) {
         for (let c = 0; c < internalClipboard[r].length; c++) {
@@ -1458,6 +1492,7 @@ function pasteClipboard() {
     }
 
     if (isCutPaste) {
+        clearMergesIntersectingRange(sourceRange);
         for (let r = sourceRange.minRow; r <= sourceRange.maxRow; r++) {
             for (let c = sourceRange.minCol; c <= sourceRange.maxCol; c++) {
                 const isInsideTarget =
@@ -1486,15 +1521,53 @@ function pasteClipboard() {
     return true;
 }
 
+/** "Hücreleri temizle": içerik, biçim, kenarlık, not ve birleştirme silinir. */
 function clearSelection() {
     const ranges = getActiveRanges();
     if (!ranges.length) return false;
 
     pushHistory();
     ranges.forEach((range) => {
+        clearMergesIntersectingRange(range);
         for (let r = range.minRow; r <= range.maxRow; r++) {
             for (let c = range.minCol; c <= range.maxCol; c++) {
                 tableData[r][c] = createEmptyCell();
+            }
+        }
+    });
+
+    recalculateAll();
+    clearClipboardState();
+    renderTable();
+    ranges.forEach(refreshChartsForChangedRange);
+    focusSelectedCell();
+    return true;
+}
+
+/** Delete/Backspace: yalnız değer ve formül silinir; biçim, kenarlık ve birleştirme kalır. */
+function clearSelectionContents() {
+    const ranges = getActiveRanges();
+    if (!ranges.length) return false;
+
+    let changed = false;
+    ranges.forEach((range) => {
+        for (let r = range.minRow; r <= range.maxRow; r++) {
+            for (let c = range.minCol; c <= range.maxCol; c++) {
+                const cell = tableData[r]?.[c];
+                if (cell && (cell.value !== "" || cell.formula)) changed = true;
+            }
+        }
+    });
+    if (!changed) return false;
+
+    pushHistory();
+    ranges.forEach((range) => {
+        for (let r = range.minRow; r <= range.maxRow; r++) {
+            for (let c = range.minCol; c <= range.maxCol; c++) {
+                const cell = tableData[r]?.[c];
+                if (!cell) continue;
+                cell.value = "";
+                cell.formula = null;
             }
         }
     });
@@ -1781,21 +1854,10 @@ function toggleMergeSelection() {
     return true;
 }
 
-function cutSelection() {
-    return setClipboardFromSelection("cut");
-}
-
-function addNoteToSelection() {
-    if (!selectedCell) return false;
-
-    alert("Not ekleme daha sonra bağlanacak.");
-    return true;
-}
-
 function handleContextMenuAction(action) {
-    if (action === "cut") cutSelection();
-    if (action === "copy") copySelection();
-    if (action === "paste") pasteClipboard();
+    if (action === "cut") copyFromMenu("cut");
+    if (action === "copy") copyFromMenu("copy");
+    if (action === "paste") pasteFromMenu();
     if (action === "insert-row-above" && contextMenuTarget?.type === "row") insertRowsAboveSelection();
     if (action === "insert-row-below" && contextMenuTarget?.type === "row") insertRowsBelowSelection();
     if (action === "delete-row" && contextMenuTarget?.type === "row") deleteSelectedRows();
@@ -1810,18 +1872,16 @@ function handleContextMenuAction(action) {
     if (action === "rename-sheet") renameActiveSheet();
     if (action === "delete-sheet") deleteActiveSheet();
     if (action === "clear") clearSelection();
-    if (action === "note") addNoteToSelection();
+    if (action === "note") editNoteForSelection();
+    if (action === "delete-note") deleteNoteForSelection();
 }
 
-function selectCell(row, col) {
+function selectCell(row, col, shouldScroll = false) {
     if (!isCellWithinBounds(row, col)) return false;
 
-    selectedCell = { row, col };
-    selectionRange = null;
-    selectionMode = "cell";
-    extraSelections = [];
-    renderTable();
-    focusSelectedCell();
+    selectSingleCell(row, col);
+    renderSelection();
+    focusSelectedCell(shouldScroll);
     return true;
 }
 
@@ -1955,7 +2015,7 @@ function startHeaderSelection(type, index) {
     }
 
     extraSelections = [];
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -1980,7 +2040,7 @@ function updateHeaderSelection(type, index) {
         };
     }
 
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -1998,7 +2058,7 @@ function updateMoveSelection(type, targetIndex) {
 
     moveSelectionState.targetIndex = targetIndex;
     moveSelectionState.moved = moveSelectionState.startIndex !== targetIndex;
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -2041,7 +2101,7 @@ function updateCellMoveTarget(row, col) {
     moveSelectionState.moved =
         row !== moveSelectionState.sourceRange.minRow ||
         col !== moveSelectionState.sourceRange.minCol;
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -2070,14 +2130,14 @@ function selectColumn(col, event = {}) {
             start: { row: 0, col: selectedCell.col },
             end: { row: rowCount - 1, col }
         };
-        renderTable();
+        renderSelection();
         focusSelectedCell();
         return;
     }
 
     if ((event.ctrlKey || event.metaKey) && selectedCell && selectionMode === "column") {
         toggleExtraColumnSelection(col);
-        renderTable();
+        renderSelection();
         focusSelectedCell();
         return;
     }
@@ -2086,7 +2146,7 @@ function selectColumn(col, event = {}) {
     selectionMode = "column";
     extraSelections = [];
     selectionRange = createColumnSelectionRange(col);
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -2100,14 +2160,14 @@ function selectRow(row, event = {}) {
             start: { row: selectedCell.row, col: 0 },
             end: { row, col: colCount - 1 }
         };
-        renderTable();
+        renderSelection();
         focusSelectedCell();
         return;
     }
 
     if ((event.ctrlKey || event.metaKey) && selectedCell && selectionMode === "row") {
         toggleExtraRowSelection(row);
-        renderTable();
+        renderSelection();
         focusSelectedCell();
         return;
     }
@@ -2116,7 +2176,7 @@ function selectRow(row, event = {}) {
     selectionMode = "row";
     extraSelections = [];
     selectionRange = createRowSelectionRange(row);
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
@@ -2128,17 +2188,14 @@ function selectAllCells() {
         start: { row: 0, col: 0 },
         end: { row: rowCount - 1, col: colCount - 1 }
     };
-    renderTable();
+    renderSelection();
     focusSelectedCell();
 }
 
 function focusSelectedCell(shouldScroll = false) {
     if (!selectedCell) return;
 
-    const cell = document.querySelector(
-        `td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`
-    );
-
+    const cell = getCellElement(selectedCell.row, selectedCell.col);
     if (!cell) return;
 
     cell.focus({ preventScroll: !shouldScroll });
@@ -2236,18 +2293,6 @@ function isCellInCurrentSelection(row, col) {
     );
 }
 
-function addRangeBoundaryClasses(cell, row, col, range, prefix) {
-    if (!isCellInNormalizedRange(row, col, range)) return;
-
-    const visualRange = getVisualCellRange(row, col);
-
-    cell.classList.add(`${prefix}-range`);
-    if (visualRange.minRow <= range.minRow) cell.classList.add(`${prefix}-top`);
-    if (visualRange.maxRow >= range.maxRow) cell.classList.add(`${prefix}-bottom`);
-    if (visualRange.minCol <= range.minCol) cell.classList.add(`${prefix}-left`);
-    if (visualRange.maxCol >= range.maxCol) cell.classList.add(`${prefix}-right`);
-}
-
 function addExtraCellSelection(row, col) {
     const existsAt = extraSelections.findIndex((range) => (
         range.start.row === row &&
@@ -2275,6 +2320,7 @@ function cloneCellData(cell, formulaOffset = null) {
         merge: cell.merge ? { ...cell.merge } : null,
         mergedTo: cell.mergedTo ? { ...cell.mergedTo } : null
     };
+    if (cell.note) clonedCell.note = cell.note;
 
     if (formulaOffset && clonedCell.formula) {
         clonedCell.formula = adjustFormulaReferences(
@@ -2288,7 +2334,7 @@ function cloneCellData(cell, formulaOffset = null) {
 }
 
 function cloneClipboardCellData(cell) {
-    return {
+    const clonedCell = {
         value: cell.value,
         formula: cell.formula,
         borders: { ...getCellBorders(cell) },
@@ -2296,6 +2342,8 @@ function cloneClipboardCellData(cell) {
         merge: null,
         mergedTo: null
     };
+    if (cell.note) clonedCell.note = cell.note;
+    return clonedCell;
 }
 
 function createEmptyBorders() {
@@ -2366,11 +2414,7 @@ function normalizeColorValue(value, fallback) {
 }
 
 function parseCellNumberForDisplay(cell) {
-    const value = cell?.formula ? cell.value : cell?.value;
-    if (value === null || value === undefined || String(value).trim() === "") return null;
-
-    const number = Number(String(value).trim().replace(",", "."));
-    return Number.isFinite(number) ? number : null;
+    return parseCellNumber(cell?.value);
 }
 
 function formatCellDateValue(cell) {
@@ -2443,6 +2487,7 @@ function formatCellDisplayValue(cell) {
 
     const number = parseCellNumberForDisplay(cell);
     if (number === null) return cell?.value ?? "";
+    if (AwFormula.isErrorText(cell?.value)) return cell.value;
 
     const decimalPlaces = Math.max(0, Math.min(8, Number(style.decimalPlaces) || 0));
     if (style.numberFormat === "currency") {
@@ -2464,6 +2509,11 @@ function formatCellDisplayValue(cell) {
             minimumFractionDigits: decimalPlaces,
             maximumFractionDigits: decimalPlaces
         });
+    }
+
+    // Formül sonuçları Türkçe ondalık virgülüyle gösterilir; yazılan değer yazıldığı gibi kalır.
+    if (cell?.formula) {
+        return number.toLocaleString("tr-TR", { maximumFractionDigits: 10, useGrouping: false });
     }
 
     return cell?.value ?? "";
@@ -2494,10 +2544,6 @@ function ensureGridSize(requiredRows, requiredCols) {
             row.push(createEmptyCell());
         });
     }
-}
-
-function insertRowAt(index) {
-    insertRowsAt(index, 1);
 }
 
 function insertRowsAt(index, count) {
@@ -2534,10 +2580,6 @@ function insertRowsAt(index, count) {
     focusSelectedCell();
 }
 
-function insertColAt(index) {
-    insertColsAt(index, 1);
-}
-
 function insertColsAt(index, count) {
     if (count <= 0) return;
 
@@ -2568,10 +2610,6 @@ function insertColsAt(index, count) {
     renderTable();
     refreshChartsFromConfigs();
     focusSelectedCell();
-}
-
-function deleteRowAt(index) {
-    deleteRowsAt([index]);
 }
 
 function deleteRowsAt(indexes) {
@@ -2614,10 +2652,6 @@ function deleteRowsAt(indexes) {
     renderTable();
     refreshChartsFromConfigs();
     focusSelectedCell();
-}
-
-function deleteColAt(index) {
-    deleteColsAt([index]);
 }
 
 function deleteColsAt(indexes) {
@@ -2698,14 +2732,15 @@ function getCellSortValue(cell) {
         return { type: "blank", value: "" };
     }
 
-    const normalizedNumber = rawValue.replace(",", ".");
-    const numberValue = Number(normalizedNumber);
-    if (Number.isFinite(numberValue)) {
+    const numberValue = parseCellNumber(rawValue);
+    if (numberValue !== null) {
         return { type: "number", value: numberValue };
     }
 
-    return { type: "text", value: rawValue.toLocaleLowerCase("tr-TR") };
+    return { type: "text", value: rawValue };
 }
+
+const sortCollator = new Intl.Collator("tr-TR", { sensitivity: "base", numeric: true });
 
 function compareSortValues(a, b, direction) {
     if (a.type === "blank" && b.type !== "blank") return 1;
@@ -2716,26 +2751,71 @@ function compareSortValues(a, b, direction) {
     const orderDiff = typeOrder[a.type] - typeOrder[b.type];
     if (orderDiff !== 0) return orderDiff * direction;
 
-    if (a.value < b.value) return -1 * direction;
-    if (a.value > b.value) return 1 * direction;
-    return 0;
+    const diff = a.type === "text" ? sortCollator.compare(a.value, b.value) : a.value - b.value;
+    return Math.sign(diff) * direction;
+}
+
+function rangeHasMerges(range) {
+    for (let r = range.minRow; r <= range.maxRow; r++) {
+        for (let c = range.minCol; c <= range.maxCol; c++) {
+            const cell = tableData[r]?.[c];
+            if (cell?.merge || cell?.mergedTo) return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Sıralanacak alan ve anahtar sütun. Bir sütun seçiliyse dolu satırların tamamı o sütuna göre
+ * sıralanır (satırlar bütün olarak yer değiştirir); ilk satır başlıksa yerinde kalır.
+ */
+function getSortPlan() {
+    const range = getActiveRange();
+    if (!range) return null;
+
+    if (selectionMode !== "column") {
+        return { range, keyCol: range.minCol };
+    }
+
+    const keyCol = selectedCell?.col ?? range.minCol;
+    const used = getLastUsedPosition();
+    if (used.row < 1) return null;
+    const firstCell = tableData[0]?.[keyCol];
+    const firstValue = String(firstCell?.value ?? "").trim();
+    let hasHeader = false;
+    if (firstValue !== "" && parseCellNumber(firstValue) === null) {
+        hasHeader = getCellStyle(firstCell).bold;
+        for (let r = 1; r <= used.row && !hasHeader; r++) {
+            if (parseCellNumber(tableData[r]?.[keyCol]?.value) !== null) hasHeader = true;
+        }
+    }
+
+    return {
+        range: { minRow: hasHeader ? 1 : 0, maxRow: used.row, minCol: 0, maxCol: Math.max(used.col, keyCol) },
+        keyCol
+    };
 }
 
 function sortActiveRange(direction = "asc") {
-    const range = getActiveRange();
-    if (!range || !canSortActiveRange()) return false;
+    const plan = getSortPlan();
+    if (!plan || isEditing || plan.range.maxRow <= plan.range.minRow) return false;
+    const { range, keyCol } = plan;
+
+    if (rangeHasMerges(range)) {
+        showAppMessage("Birleştirilmiş hücre içeren bir alan sıralanamaz. Önce birleştirmeyi kaldırın.");
+        return false;
+    }
 
     const directionMultiplier = direction === "desc" ? -1 : 1;
+    const isFullWidth = range.minCol === 0 && range.maxCol >= colCount - 1;
     const rows = [];
 
     for (let row = range.minRow; row <= range.maxRow; row++) {
         rows.push({
             row,
             height: rowHeights[row],
-            cells: tableData[row]
-                .slice(range.minCol, range.maxCol + 1)
-                .map((cell) => cloneCellData(cell)),
-            sortValue: getCellSortValue(tableData[row][range.minCol])
+            cells: tableData[row].slice(range.minCol, range.maxCol + 1),
+            sortValue: getCellSortValue(tableData[row][keyCol])
         });
     }
 
@@ -2748,9 +2828,13 @@ function sortActiveRange(direction = "asc") {
     rows.forEach((item, offset) => {
         const targetRow = range.minRow + offset;
         for (let col = range.minCol; col <= range.maxCol; col++) {
-            tableData[targetRow][col] = cloneCellData(item.cells[col - range.minCol]);
+            // Satır taşınmış gibi: aynı satıra bakan göreli başvurular yeni satırı gösterir.
+            tableData[targetRow][col] = cloneCellData(item.cells[col - range.minCol], {
+                rowOffset: targetRow - item.row,
+                colOffset: 0
+            });
         }
-        if (range.minCol === 0 && range.maxCol === colCount - 1) {
+        if (isFullWidth || selectionMode === "column") {
             rowHeights[targetRow] = item.height;
         }
     });
@@ -2834,30 +2918,6 @@ function hideSelectedRowsOrColumns() {
     }
 
     return false;
-}
-
-function showHiddenRows() {
-    if (hiddenRows.size === 0) return false;
-
-    pushHistory();
-    hiddenRows.clear();
-    renderTable();
-    focusSelectedCell();
-    updateToolbarState();
-    scheduleAutoSave();
-    return true;
-}
-
-function showHiddenColumns() {
-    if (hiddenCols.size === 0) return false;
-
-    pushHistory();
-    hiddenCols.clear();
-    renderTable();
-    focusSelectedCell();
-    updateToolbarState();
-    scheduleAutoSave();
-    return true;
 }
 
 function showHiddenRowsAndColumns() {
@@ -3193,14 +3253,7 @@ function setCellText(row, col, text) {
     const cell = tableData[row]?.[col];
     if (!cell) return false;
 
-    if (String(text).startsWith("=")) {
-        cell.formula = String(text);
-        cell.value = evaluateFormula(cell.formula, row, col);
-    } else {
-        cell.formula = null;
-        cell.value = String(text);
-    }
-
+    setCellInput(cell, text);
     return true;
 }
 
@@ -3423,6 +3476,12 @@ function moveSelectedCellsTo(targetRow, targetCol) {
 
     sourceCells.forEach(({ row, col }) => {
         tableData[row][col] = createEmptyCell();
+    });
+    clearMergesIntersectingRange({
+        minRow: sourceRange.minRow + rowOffset,
+        maxRow: sourceRange.maxRow + rowOffset,
+        minCol: sourceRange.minCol + colOffset,
+        maxCol: sourceRange.maxCol + colOffset
     });
 
     sourceCells.forEach(({ targetRow: row, targetCol: col, cell }) => {
@@ -3661,8 +3720,16 @@ function cloneSavedChartState(chart) {
     };
 }
 
-function createSheetState(name) {
+let nextSheetId = 1;
+const sheetHistories = new Map();
+
+function createSheetId() {
+    return `s${Date.now().toString(36)}${(nextSheetId++).toString(36)}`;
+}
+
+function createSheetState(name, id = sheets[activeSheetIndex]?.id ?? createSheetId()) {
     return {
+        id,
         name,
         rowCount,
         colCount,
@@ -3685,6 +3752,7 @@ function createSheetState(name) {
 
 function createBlankSheetState(name) {
     return {
+        id: createSheetId(),
         name,
         rowCount: 100,
         colCount: 26,
@@ -3707,6 +3775,7 @@ function createBlankSheetState(name) {
 
 function cloneSheetState(sheet, name) {
     return {
+        id: createSheetId(),
         name,
         rowCount: sheet.rowCount,
         colCount: sheet.colCount,
@@ -3757,7 +3826,10 @@ function isSheetEmpty(sheet) {
 function captureCurrentSheet() {
     if (!sheets[activeSheetIndex]) return;
 
-    sheets[activeSheetIndex] = createSheetState(sheets[activeSheetIndex].name);
+    const { id, name } = sheets[activeSheetIndex];
+    sheets[activeSheetIndex] = createSheetState(name, id);
+    // Geri al/yinele geçmişi her sayfada ayrı tutulur; sayfa değiştirince kaybolmaz.
+    sheetHistories.set(id, { undoStack, redoStack });
 }
 
 function applySheetState(sheet) {
@@ -3779,6 +3851,9 @@ function applySheetState(sheet) {
     internalClipboard = null;
     clipboardMode = null;
     isEditing = false;
+    const history = sheetHistories.get(sheet.id);
+    undoStack = history?.undoStack ?? [];
+    redoStack = history?.redoStack ?? [];
     clearChartWorkspace();
     nextChartNumber = Math.max(1, Number(sheet.nextChartNumber) || 1);
     restoreChartWorkspace(sheet.charts, sheet.activeChartId);
@@ -3878,8 +3953,6 @@ function renderSheetTabs() {
             captureCurrentSheet();
             activeSheetIndex = index;
             applySheetState(sheets[activeSheetIndex]);
-            undoStack = [];
-            redoStack = [];
             renderSheetTabs();
             renderTable();
             focusSelectedCell();
@@ -3889,8 +3962,6 @@ function renderSheetTabs() {
                 captureCurrentSheet();
                 activeSheetIndex = index;
                 applySheetState(sheets[activeSheetIndex]);
-                undoStack = [];
-                redoStack = [];
                 renderSheetTabs();
                 renderTable();
             }
@@ -3920,14 +3991,19 @@ function renderSheetTabs() {
     updateStatusSummary();
 }
 
+function getNextSheetName() {
+    const names = new Set(sheets.map((sheet) => sheet.name.toLocaleLowerCase("tr-TR")));
+    let number = sheets.length + 1;
+    while (names.has(`sayfa${number}`)) number++;
+    return `Sayfa${number}`;
+}
+
 function addSheet() {
+    if (isEditing) exitEditMode(true);
     captureCurrentSheet();
-    const nextNumber = sheets.length + 1;
-    sheets.push(createBlankSheetState(`Sayfa${nextNumber}`));
+    sheets.push(createBlankSheetState(getNextSheetName()));
     activeSheetIndex = sheets.length - 1;
     applySheetState(sheets[activeSheetIndex]);
-    undoStack = [];
-    redoStack = [];
     renderSheetTabs();
     renderTable();
     focusSelectedCell();
@@ -3959,8 +4035,6 @@ function duplicateSheet() {
     sheets.splice(insertIndex, 0, copy);
     activeSheetIndex = insertIndex;
     applySheetState(sheets[activeSheetIndex]);
-    undoStack = [];
-    redoStack = [];
     renderSheetTabs();
     renderTable();
     focusSelectedCell();
@@ -3978,8 +4052,6 @@ function startSheetRename(index) {
         captureCurrentSheet();
         activeSheetIndex = index;
         applySheetState(sheets[activeSheetIndex]);
-        undoStack = [];
-        redoStack = [];
         renderTable();
     }
 
@@ -3992,10 +4064,18 @@ function finishSheetRename(index, name, shouldSave) {
     if (renamingSheetIndex !== index) return;
 
     if (shouldSave) {
-        const trimmedName = name.trim();
-        if (trimmedName) {
+        const trimmedName = name.trim().replace(/[\[\]:*?/\\]/g, " ").slice(0, 31).trim();
+        const oldName = sheets[index].name;
+        const isTaken = sheets.some((sheet, sheetIndex) => sheetIndex !== index && isSameSheetName(sheet.name, trimmedName));
+        if (trimmedName && trimmedName !== oldName && !isTaken) {
             captureCurrentSheet();
             sheets[index].name = trimmedName;
+            renameSheetReferences(oldName, trimmedName);
+            recalculateAll();
+            renderTable();
+            scheduleAutoSave();
+        } else if (isTaken) {
+            showAppMessage(`"${trimmedName}" adlı bir sayfa zaten var.`);
         }
     }
 
@@ -4020,30 +4100,32 @@ function reorderSheet(fromIndex, toIndex) {
     }
 
     applySheetState(sheets[activeSheetIndex]);
-    undoStack = [];
-    redoStack = [];
     renderSheetTabs();
     renderTable();
     focusSelectedCell();
     return true;
 }
 
-function deleteActiveSheet() {
+async function deleteActiveSheet() {
     if (sheets.length <= 1) return false;
 
+    if (isEditing) exitEditMode(true);
     captureCurrentSheet();
     const sheet = sheets[activeSheetIndex];
     if (!isSheetEmpty(sheet)) {
         const sheetName = sheet?.name || "Bu sayfa";
-        const shouldDelete = window.confirm(`"${sheetName}" boş değil. Yine de silmek istiyor musunuz?`);
+        const shouldDelete = await showAppConfirm(`"${sheetName}" boş değil. Silinen sayfa geri alınamaz. Yine de silinsin mi?`, {
+            confirmText: "Sil",
+            danger: true
+        });
         if (!shouldDelete) return false;
     }
 
+    sheetHistories.delete(sheet.id);
     sheets.splice(activeSheetIndex, 1);
     activeSheetIndex = Math.max(0, activeSheetIndex - 1);
     applySheetState(sheets[activeSheetIndex]);
-    undoStack = [];
-    redoStack = [];
+    recalculateAll();
     renderSheetTabs();
     renderTable();
     focusSelectedCell();
@@ -4051,7 +4133,7 @@ function deleteActiveSheet() {
 }
 
 function getNextSaveNumber() {
-    const storedValue = Number(localStorage.getItem(SAVE_NAME_COUNTER_KEY));
+    const storedValue = Number(safeStorageGet(SAVE_NAME_COUNTER_KEY));
     return Number.isInteger(storedValue) && storedValue > 0 ? storedValue : 1;
 }
 
@@ -4065,7 +4147,7 @@ function updateNextSaveNumber(fileName) {
     const usedNumber = match ? Number(match[1]) : currentNumber;
     const nextNumber = Math.max(currentNumber + 1, usedNumber + 1);
 
-    localStorage.setItem(SAVE_NAME_COUNTER_KEY, String(nextNumber));
+    safeStorageSet(SAVE_NAME_COUNTER_KEY, String(nextNumber));
 }
 
 function sanitizeFileName(name) {
@@ -4104,10 +4186,15 @@ function clearCurrentWorkbookFile() {
     document.title = "awCELL";
 }
 
-function createNewWorkbook() {
-    if (!confirm("Mevcut çalışma temizlenip boş bir awCELL dosyası oluşturulsun mu?")) {
+async function createNewWorkbook() {
+    const hasContent = sheets.length > 1 || !isSheetEmpty(createSheetState(sheets[activeSheetIndex]?.name ?? "Sayfa1"));
+    if (hasContent && !(await showAppConfirm("Açık çalışma kapatılıp boş bir dosya açılsın mı? Kaydedilmemiş değişiklikler kaybolur.", {
+        confirmText: "Yeni dosya",
+        danger: true
+    }))) {
         return false;
     }
+    if (isEditing) exitEditMode(false);
 
     isLoadingWorkbook = true;
     rowCount = 100;
@@ -4131,11 +4218,13 @@ function createNewWorkbook() {
     renamingSheetIndex = null;
     undoStack = [];
     redoStack = [];
+    sheetHistories.clear();
+    importedFileBaseName = null;
     isEditing = false;
     editBackupValue = "";
     formulaInputBackupValue = "";
     clearCurrentWorkbookFile();
-    localStorage.removeItem(AUTOSAVE_KEY);
+    safeStorageRemove(AUTOSAVE_KEY);
 
     clearChartWorkspace();
     sheets = [createBlankSheetState("Sayfa1")];
@@ -4148,10 +4237,46 @@ function createNewWorkbook() {
     return true;
 }
 
+let importedFileBaseName = null;
+
 function getCurrentSaveBaseName() {
-    return currentWorkbookFileName
-        ? getFileBaseName(currentWorkbookFileName)
-        : getDefaultSaveBaseName();
+    if (currentWorkbookFileName) return getFileBaseName(currentWorkbookFileName);
+    return importedFileBaseName ? sanitizeFileName(importedFileBaseName) || getDefaultSaveBaseName() : getDefaultSaveBaseName();
+}
+
+/** Kayıtta yalnız varsayılandan farklı alanlar yazılır; boş hücre null olur (dosya küçük kalır). */
+function compactCellForSave(cell) {
+    if (!cell) return null;
+
+    const compact = {};
+    if (cell.value !== "" && cell.value !== null && cell.value !== undefined) compact.value = cell.value;
+    if (cell.formula) compact.formula = cell.formula;
+
+    const defaults = createDefaultCellStyle();
+    const style = {};
+    Object.entries(getCellStyle(cell)).forEach(([key, value]) => {
+        if (value !== defaults[key]) style[key] = value;
+    });
+    if (Object.keys(style).length) compact.style = style;
+
+    const borders = Object.fromEntries(Object.entries(getCellBorders(cell)).filter(([, value]) => value));
+    if (Object.keys(borders).length) compact.borders = borders;
+    if (cell.merge) compact.merge = { ...cell.merge };
+    if (cell.mergedTo) compact.mergedTo = { ...cell.mergedTo };
+    if (cell.note) compact.note = cell.note;
+
+    return Object.keys(compact).length ? compact : null;
+}
+
+function compactTableDataForSave(data) {
+    let lastRow = -1;
+    const rows = data.map((row, rowIndex) => {
+        const cells = row.map(compactCellForSave);
+        while (cells.length && cells[cells.length - 1] === null) cells.pop();
+        if (cells.length) lastRow = rowIndex;
+        return cells;
+    });
+    return rows.slice(0, lastRow + 1);
 }
 
 function createSavePayload() {
@@ -4167,7 +4292,7 @@ function createSavePayload() {
             selectedCell: sheet.selectedCell ? { ...sheet.selectedCell } : { row: 0, col: 0 },
             selectionRange: cloneRange(sheet.selectionRange),
             activeFilter: cloneFilter(sheet.activeFilter),
-            tableData: cloneTableData(sheet.tableData),
+            tableData: compactTableDataForSave(sheet.tableData),
             colWidths: [...sheet.colWidths],
             rowHeights: [...sheet.rowHeights],
             hiddenRows: [...(sheet.hiddenRows ?? [])],
@@ -4193,11 +4318,11 @@ function scheduleAutoSave() {
     if (!isAppInitialized || isLoadingWorkbook) return;
 
     window.clearTimeout(autoSaveTimer);
-    autoSaveTimer = window.setTimeout(saveAutoSavedWorkbook, 250);
+    autoSaveTimer = window.setTimeout(saveAutoSavedWorkbook, 600);
 }
 
 function loadAutoSavedWorkbook() {
-    const storedPayload = localStorage.getItem(AUTOSAVE_KEY);
+    const storedPayload = safeStorageGet(AUTOSAVE_KEY);
     if (!storedPayload) return false;
 
     try {
@@ -4205,7 +4330,7 @@ function loadAutoSavedWorkbook() {
         loadWorkbookPayload(JSON.parse(storedPayload));
         return true;
     } catch {
-        localStorage.removeItem(AUTOSAVE_KEY);
+        safeStorageRemove(AUTOSAVE_KEY);
         return false;
     } finally {
         isLoadingWorkbook = false;
@@ -4222,14 +4347,46 @@ function isPageReload() {
 }
 
 function normalizeImportedCell(cell) {
-    return {
-        value: cell?.value ?? "",
-        formula: cell?.formula ?? null,
+    const formula = typeof cell?.formula === "string" && cell.formula.startsWith("=") ? cell.formula : null;
+    const normalizedCell = {
+        value: cell?.value === null || cell?.value === undefined ? "" : String(cell.value),
+        formula,
         borders: { ...getCellBorders(cell) },
         style: { ...getCellStyle(cell) },
         merge: cell?.merge ? { ...cell.merge } : null,
         mergedTo: cell?.mergedTo ? { ...cell.mergedTo } : null
     };
+    if (typeof cell?.note === "string" && cell.note) normalizedCell.note = cell.note;
+    return normalizedCell;
+}
+
+/** Bozuk birleştirme bilgisi (sınır dışına taşan ya da sahipsiz hücre) temizlenir. */
+function repairImportedMerges(tableDataValue, rowCountValue, colCountValue) {
+    for (let r = 0; r < rowCountValue; r++) {
+        for (let c = 0; c < colCountValue; c++) {
+            const cell = tableDataValue[r][c];
+            if (cell.merge) {
+                const rowspan = Math.max(1, Math.min(Number(cell.merge.rowspan) || 1, rowCountValue - r));
+                const colspan = Math.max(1, Math.min(Number(cell.merge.colspan) || 1, colCountValue - c));
+                cell.merge = rowspan > 1 || colspan > 1 ? { rowspan, colspan } : null;
+            }
+            cell.mergedTo = null;
+        }
+    }
+    for (let r = 0; r < rowCountValue; r++) {
+        for (let c = 0; c < colCountValue; c++) {
+            const merge = tableDataValue[r][c].merge;
+            if (!merge) continue;
+            for (let mr = r; mr < r + merge.rowspan; mr++) {
+                for (let mc = c; mc < c + merge.colspan; mc++) {
+                    if (mr === r && mc === c) continue;
+                    const child = tableDataValue[mr][mc];
+                    child.merge = null;
+                    child.mergedTo = { row: r, col: c };
+                }
+            }
+        }
+    }
 }
 
 function normalizeImportedRange(range, rowCountValue, colCountValue) {
@@ -4340,8 +4497,8 @@ function normalizeImportedFilter(filter, rowCountValue, colCountValue) {
 }
 
 function normalizeImportedSheet(sheet, index) {
-    const safeRowCount = Math.max(MIN_ROW_SIZE, Number(sheet?.rowCount) || 100);
-    const safeColCount = Math.max(MIN_COL_SIZE, Number(sheet?.colCount) || 26);
+    const safeRowCount = Math.min(AwFileIO.MAX_IMPORT_ROWS, Math.max(MIN_ROW_SIZE, Math.floor(Number(sheet?.rowCount)) || 100));
+    const safeColCount = Math.min(AwFileIO.MAX_IMPORT_COLS, Math.max(MIN_COL_SIZE, Math.floor(Number(sheet?.colCount)) || 26));
     const safeTableData = [];
 
     for (let r = 0; r < safeRowCount; r++) {
@@ -4362,8 +4519,11 @@ function normalizeImportedSheet(sheet, index) {
         ...normalizedCharts.map((chart) => chart.id + 1)
     );
 
+    repairImportedMerges(safeTableData, safeRowCount, safeColCount);
+
     return {
-        name: String(sheet?.name || `Sayfa${index + 1}`),
+        id: createSheetId(),
+        name: String(sheet?.name || `Sayfa${index + 1}`).slice(0, 31),
         rowCount: safeRowCount,
         colCount: safeColCount,
         selectedCell: {
@@ -4405,35 +4565,90 @@ function loadWorkbookPayload(payload) {
         throw new Error("Geçersiz awCELL dosyası.");
     }
 
+    if (isEditing) exitEditMode(false);
     sheets = payload.sheets.map(normalizeImportedSheet);
     activeSheetIndex = Math.max(0, Math.min(sheets.length - 1, Number(payload.activeSheetIndex) || 0));
+    sheetHistories.clear();
     undoStack = [];
     redoStack = [];
     renamingSheetIndex = null;
     extraSelections = [];
+    importedFileBaseName = null;
     clearClipboardState();
     applySheetState(sheets[activeSheetIndex]);
     normalizeSelectedCell();
+    recalculateAll();
     renderSheetTabs();
     renderTable();
     focusSelectedCell();
     scheduleAutoSave();
 }
 
+const OPENABLE_EXTENSIONS = ["awc", "json", "xlsx", "xlsm", "ods", "csv", "tsv", "txt"];
+const OPEN_FILE_TYPES = [
+    {
+        description: "Elektronik tablolar (.awc, .xlsx, .ods, .csv)",
+        accept: {
+            "application/json": [".awc"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+            "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
+            "text/csv": [".csv", ".tsv", ".txt"]
+        }
+    }
+];
+
+/** Başka bir biçimden gelen sayfaları awCELL yüküne çevirir. */
+function createImportedPayload(result) {
+    return {
+        app: "awCELL",
+        version: 1,
+        activeSheetIndex: result.activeSheetIndex ?? 0,
+        sheets: result.sheets
+    };
+}
+
 async function openWorkbookFile(file, handle = null) {
     if (!file) return false;
 
-    const text = await file.text();
-    const payload = JSON.parse(text);
-    loadWorkbookPayload(payload);
-    setCurrentWorkbookFile(file.name, handle);
+    const extension = getFileExtension(file.name);
+    if (extension === "xls") {
+        throw new Error("Eski Excel (.xls) dosyaları açılamıyor. Dosyayı Excel ya da LibreOffice'te .xlsx olarak kaydedip yeniden açın.");
+    }
+    if (!OPENABLE_EXTENSIONS.includes(extension)) {
+        throw new Error("Bu dosya türü açılamıyor. awCELL .awc, .xlsx, .ods ve .csv dosyalarını açar.");
+    }
+
+    if (extension === "awc" || extension === "json") {
+        const payload = JSON.parse(await file.text());
+        loadWorkbookPayload(payload);
+        setCurrentWorkbookFile(file.name, handle);
+        return true;
+    }
+
+    const buffer = await file.arrayBuffer();
+    let result;
+    if (extension === "xlsx" || extension === "xlsm") {
+        result = await AwFileIO.importXlsx(buffer);
+    } else if (extension === "ods") {
+        result = await AwFileIO.importOds(buffer);
+    } else {
+        result = AwFileIO.importCsv(buffer, getFileBaseName(file.name).slice(0, 31) || "Sayfa1");
+    }
+
+    loadWorkbookPayload(createImportedPayload(result));
+    clearCurrentWorkbookFile();
+    document.title = `${file.name} - awCELL`;
+    importedFileBaseName = getFileBaseName(file.name);
+    if (result.warnings?.length) {
+        showAppMessage(result.warnings.join("\n"), "Dosyanın bir bölümü alınmadı");
+    }
     return true;
 }
 
 async function openWorkbook() {
     if ("showOpenFilePicker" in window) {
         const [handle] = await window.showOpenFilePicker({
-            types: [AWC_FILE_TYPE],
+            types: OPEN_FILE_TYPES,
             multiple: false
         });
         const file = await handle.getFile();
@@ -4448,369 +4663,49 @@ async function openWorkbook() {
     return true;
 }
 
-function xmlEscape(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-}
-
-function getSheetCellText(sheet, row, col) {
-    const cell = sheet.tableData[row]?.[col];
-    if (!cell) return "";
-
-    return cell.formula ?? cell.value ?? "";
-}
-
-function getUsedSheetBounds(sheet) {
-    let maxRow = 0;
-    let maxCol = 0;
-
-    for (let r = 0; r < sheet.rowCount; r++) {
-        for (let c = 0; c < sheet.colCount; c++) {
-            if (getSheetCellText(sheet, r, c) !== "") {
-                maxRow = Math.max(maxRow, r);
-                maxCol = Math.max(maxCol, c);
-            }
+async function runOpenWorkbook() {
+    hideFileMenu();
+    if (isEditing) exitEditMode(true);
+    try {
+        await openWorkbook();
+    } catch (error) {
+        if (error?.name !== "AbortError") {
+            showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
         }
     }
-
-    return { maxRow, maxCol };
 }
 
-function sanitizeSpreadsheetName(name, fallback) {
-    const cleanedName = String(name || fallback)
-        .replace(/[\[\]:*?/\\]/g, " ")
-        .trim()
-        .slice(0, 31);
+const SAVE_FORMATS = [
+    { value: "awc", label: "awCELL dosyası (.awc)" },
+    { value: "xlsx", label: "Excel çalışma kitabı (.xlsx)" },
+    { value: "ods", label: "LibreOffice Calc (.ods)" },
+    { value: "pdf", label: "PDF belgesi (.pdf)" },
+    { value: "csv", label: "CSV, yalnız bu sayfa (.csv)" },
+    { value: "xls", label: "Excel 2003 XML (.xls)" }
+];
 
-    return cleanedName || fallback;
-}
-
-function buildXmlWorkbook(payload) {
-    const worksheets = payload.sheets.map((sheet, index) => {
-        const bounds = getUsedSheetBounds(sheet);
-        const rows = [];
-
-        for (let r = 0; r <= bounds.maxRow; r++) {
-            const cells = [];
-            for (let c = 0; c <= bounds.maxCol; c++) {
-                const value = getSheetCellText(sheet, r, c);
-                const formula = value.startsWith("=") ? ` ss:Formula="${xmlEscape(value)}"` : "";
-                const plainValue = value.startsWith("=") ? "" : value;
-                const type = plainValue.trim() !== "" && Number.isFinite(Number(plainValue)) ? "Number" : "String";
-                cells.push(`<Cell${formula}><Data ss:Type="${type}">${xmlEscape(plainValue)}</Data></Cell>`);
-            }
-            rows.push(`<Row>${cells.join("")}</Row>`);
-        }
-
-        const sheetName = sanitizeSpreadsheetName(sheet.name, `Sayfa${index + 1}`);
-        return `<Worksheet ss:Name="${xmlEscape(sheetName)}"><Table>${rows.join("")}</Table></Worksheet>`;
-    });
-
-    return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><DocumentProperties xmlns="urn:schemas-microsoft-com:office:office"><Author>awCELL</Author></DocumentProperties><ExcelWorkbook xmlns="urn:schemas-microsoft-com:office:excel"><ProtectStructure>False</ProtectStructure><ProtectWindows>False</ProtectWindows></ExcelWorkbook>${worksheets.join("")}</Workbook>`;
-}
-
-function createAvcBlob(payload) {
-    return new Blob([JSON.stringify(payload, null, 2)], {
+function createAwcBlob(payload) {
+    return new Blob([JSON.stringify(payload)], {
         type: "application/json"
     });
 }
 
-function createXlsBlob(payload) {
-    return new Blob([buildXmlWorkbook(payload)], {
-        type: "application/vnd.ms-excel"
-    });
-}
-
-function createCrc32Table() {
-    const table = [];
-    for (let i = 0; i < 256; i++) {
-        let value = i;
-        for (let bit = 0; bit < 8; bit++) {
-            value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-        }
-        table.push(value >>> 0);
-    }
-    return table;
-}
-
-const CRC32_TABLE = createCrc32Table();
-
-function getCrc32(bytes) {
-    let crc = 0xffffffff;
-    for (const byte of bytes) {
-        crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-    }
-    return (crc ^ 0xffffffff) >>> 0;
-}
-
-function writeUint16(view, offset, value) {
-    view.setUint16(offset, value, true);
-}
-
-function writeUint32(view, offset, value) {
-    view.setUint32(offset, value, true);
-}
-
-function createZipBlob(entries, type) {
-    const encoder = new TextEncoder();
-    const preparedEntries = entries.map((entry) => ({
-        nameBytes: encoder.encode(entry.name),
-        dataBytes: typeof entry.data === "string" ? encoder.encode(entry.data) : entry.data,
-        name: entry.name
-    }));
-    const localParts = [];
-    const centralParts = [];
-    let offset = 0;
-
-    preparedEntries.forEach((entry) => {
-        const crc = getCrc32(entry.dataBytes);
-        const localHeader = new Uint8Array(30);
-        const localView = new DataView(localHeader.buffer);
-        writeUint32(localView, 0, 0x04034b50);
-        writeUint16(localView, 4, 20);
-        writeUint16(localView, 6, 0);
-        writeUint16(localView, 8, 0);
-        writeUint16(localView, 10, 0);
-        writeUint16(localView, 12, 0);
-        writeUint32(localView, 14, crc);
-        writeUint32(localView, 18, entry.dataBytes.length);
-        writeUint32(localView, 22, entry.dataBytes.length);
-        writeUint16(localView, 26, entry.nameBytes.length);
-        writeUint16(localView, 28, 0);
-        localParts.push(localHeader, entry.nameBytes, entry.dataBytes);
-
-        const centralHeader = new Uint8Array(46);
-        const centralView = new DataView(centralHeader.buffer);
-        writeUint32(centralView, 0, 0x02014b50);
-        writeUint16(centralView, 4, 20);
-        writeUint16(centralView, 6, 20);
-        writeUint16(centralView, 8, 0);
-        writeUint16(centralView, 10, 0);
-        writeUint16(centralView, 12, 0);
-        writeUint16(centralView, 14, 0);
-        writeUint32(centralView, 16, crc);
-        writeUint32(centralView, 20, entry.dataBytes.length);
-        writeUint32(centralView, 24, entry.dataBytes.length);
-        writeUint16(centralView, 28, entry.nameBytes.length);
-        writeUint16(centralView, 30, 0);
-        writeUint16(centralView, 32, 0);
-        writeUint16(centralView, 34, 0);
-        writeUint16(centralView, 36, 0);
-        writeUint32(centralView, 38, 0);
-        writeUint32(centralView, 42, offset);
-        centralParts.push(centralHeader, entry.nameBytes);
-
-        offset += localHeader.length + entry.nameBytes.length + entry.dataBytes.length;
-    });
-
-    const centralOffset = offset;
-    const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
-    const endHeader = new Uint8Array(22);
-    const endView = new DataView(endHeader.buffer);
-    writeUint32(endView, 0, 0x06054b50);
-    writeUint16(endView, 8, preparedEntries.length);
-    writeUint16(endView, 10, preparedEntries.length);
-    writeUint32(endView, 12, centralSize);
-    writeUint32(endView, 16, centralOffset);
-
-    return new Blob([...localParts, ...centralParts, endHeader], { type });
-}
-
-function buildXlsxSheetXml(sheet) {
-    const bounds = getUsedSheetBounds(sheet);
-    const rows = [];
-
-    for (let r = 0; r <= bounds.maxRow; r++) {
-        const cells = [];
-        for (let c = 0; c <= bounds.maxCol; c++) {
-            const value = getSheetCellText(sheet, r, c);
-            if (value === "") continue;
-
-            const cellRef = `${getColumnLabel(c)}${r + 1}`;
-            const formula = value.startsWith("=") ? value.slice(1) : null;
-            const numericValue = !formula && value.trim() !== "" && Number.isFinite(Number(value));
-            if (formula) {
-                cells.push(`<c r="${cellRef}"><f>${xmlEscape(formula)}</f></c>`);
-            } else if (numericValue) {
-                cells.push(`<c r="${cellRef}"><v>${xmlEscape(value)}</v></c>`);
-            } else {
-                cells.push(`<c r="${cellRef}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`);
-            }
-        }
-        rows.push(`<row r="${r + 1}">${cells.join("")}</row>`);
-    }
-
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.join("")}</sheetData></worksheet>`;
-}
-
-function createXlsxBlob(payload) {
-    const sheetFiles = payload.sheets.map((sheet, index) => ({
-        name: `xl/worksheets/sheet${index + 1}.xml`,
-        data: buildXlsxSheetXml(sheet)
-    }));
-    const sheetContentTypes = payload.sheets
-        .map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
-        .join("");
-    const sheetsXml = payload.sheets
-        .map((sheet, index) => `<sheet name="${xmlEscape(sanitizeSpreadsheetName(sheet.name, `Sayfa${index + 1}`))}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`)
-        .join("");
-    const sheetRels = payload.sheets
-        .map((_, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`)
-        .join("");
-
-    return createZipBlob([
-        {
-            name: "[Content_Types].xml",
-            data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheetContentTypes}</Types>`
-        },
-        {
-            name: "_rels/.rels",
-            data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`
-        },
-        {
-            name: "xl/workbook.xml",
-            data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetsXml}</sheets></workbook>`
-        },
-        {
-            name: "xl/_rels/workbook.xml.rels",
-            data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetRels}<Relationship Id="rId${payload.sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
-        },
-        {
-            name: "xl/styles.xml",
-            data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="1"><xf/></cellXfs></styleSheet>`
-        },
-        ...sheetFiles
-    ], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-}
-
-function buildOdsContentXml(payload) {
-    const tables = payload.sheets.map((sheet) => {
-        const bounds = getUsedSheetBounds(sheet);
-        const rows = [];
-
-        for (let r = 0; r <= bounds.maxRow; r++) {
-            const cells = [];
-            for (let c = 0; c <= bounds.maxCol; c++) {
-                const value = getSheetCellText(sheet, r, c);
-                const number = value.trim() !== "" && Number.isFinite(Number(value));
-                if (number) {
-                    cells.push(`<table:table-cell office:value-type="float" office:value="${xmlEscape(value)}"><text:p>${xmlEscape(value)}</text:p></table:table-cell>`);
-                } else {
-                    cells.push(`<table:table-cell office:value-type="string"><text:p>${xmlEscape(value)}</text:p></table:table-cell>`);
-                }
-            }
-            rows.push(`<table:table-row>${cells.join("")}</table:table-row>`);
-        }
-
-        return `<table:table table:name="${xmlEscape(sheet.name)}">${rows.join("")}</table:table>`;
-    });
-
-    return `<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2"><office:body><office:spreadsheet>${tables.join("")}</office:spreadsheet></office:body></office:document-content>`;
-}
-
-function createOdsBlob(payload) {
-    return createZipBlob([
-        {
-            name: "mimetype",
-            data: "application/vnd.oasis.opendocument.spreadsheet"
-        },
-        {
-            name: "META-INF/manifest.xml",
-            data: `<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>`
-        },
-        {
-            name: "content.xml",
-            data: buildOdsContentXml(payload)
-        }
-    ], "application/vnd.oasis.opendocument.spreadsheet");
-}
-
-function pdfEscape(value) {
-    return String(value ?? "")
-        .replace(/[^\x20-\x7e]/g, "?")
-        .replace(/\\/g, "\\\\")
-        .replace(/\(/g, "\\(")
-        .replace(/\)/g, "\\)");
-}
-
-function buildPdfPages(payload) {
-    const pages = [];
-    const maxLinesPerPage = 42;
-
-    payload.sheets.forEach((sheet) => {
-        const bounds = getUsedSheetBounds(sheet);
-        const lines = [sheet.name, ""];
-
-        for (let r = 0; r <= bounds.maxRow; r++) {
-            const cells = [];
-            for (let c = 0; c <= bounds.maxCol; c++) {
-                cells.push(getSheetCellText(sheet, r, c));
-            }
-            lines.push(cells.join("    "));
-        }
-
-        for (let i = 0; i < lines.length; i += maxLinesPerPage) {
-            pages.push(lines.slice(i, i + maxLinesPerPage));
-        }
-    });
-
-    return pages.length ? pages : [["awCELL"]];
-}
-
-function createPdfBlob(payload) {
-    const pages = buildPdfPages(payload);
-    const objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>",
-        ""
-    ];
-    const pageObjectIds = [];
-
-    pages.forEach((lines) => {
-        const pageObjectId = objects.length + 1;
-        const contentObjectId = pageObjectId + 1;
-        pageObjectIds.push(pageObjectId);
-
-        const textLines = lines.map((line, index) => {
-            const y = 800 - index * 17;
-            return `BT /F1 11 Tf 50 ${y} Td (${pdfEscape(line)}) Tj ET`;
-        });
-        const content = textLines.join("\n");
-
-        objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${pages.length * 2 + 3} 0 R >> >> /Contents ${contentObjectId} 0 R >>`);
-        objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-    });
-
-    objects[1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
-    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-
-    let pdf = "%PDF-1.4\n";
-    const offsets = [0];
-    objects.forEach((object, index) => {
-        offsets.push(pdf.length);
-        pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-    });
-
-    const xrefOffset = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-    offsets.slice(1).forEach((offset) => {
-        pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-    });
-    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-    return new Blob([pdf], { type: "application/pdf" });
-}
-
-function createBlobForFileName(fileName, payload) {
+async function createBlobForFileName(fileName, payload) {
     const extension = getFileExtension(fileName);
-    if (extension === "xls") return createXlsBlob(payload);
-    if (extension === "xlsx") return createXlsxBlob(payload);
-    if (extension === "ods") return createOdsBlob(payload);
-    if (extension === "pdf") return createPdfBlob(payload);
-    return createAvcBlob(payload);
+    if (extension === "xls") {
+        return new Blob([AwFileIO.buildXmlSpreadsheet(payload)], { type: "application/vnd.ms-excel" });
+    }
+    if (extension === "xlsx") {
+        return new Blob([AwFileIO.buildXlsx(payload)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    }
+    if (extension === "ods") {
+        return new Blob([AwFileIO.buildOds(payload)], { type: "application/vnd.oasis.opendocument.spreadsheet" });
+    }
+    if (extension === "csv") {
+        return new Blob([AwFileIO.buildCsv(payload.sheets[payload.activeSheetIndex] ?? payload.sheets[0])], { type: "text/csv;charset=utf-8" });
+    }
+    if (extension === "pdf") return createPdfBlob();
+    return createAwcBlob(payload);
 }
 
 function downloadSaveFile(blob, fileName) {
@@ -4822,7 +4717,7 @@ function downloadSaveFile(blob, fileName) {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 async function writeSaveFile(blob, fileName, types = [AWC_FILE_TYPE]) {
@@ -4853,9 +4748,10 @@ async function writeSaveAsFile(defaultName) {
             suggestedName: `${defaultName}.awc`,
             types: SAVE_AS_FILE_TYPES
         });
-        const fileName = handle.name || `${defaultName}.awc`;
+        let fileName = handle.name || `${defaultName}.awc`;
+        if (!getFileExtension(fileName)) fileName = `${fileName}.awc`;
         const payload = createSavePayload();
-        const blob = createBlobForFileName(fileName, payload);
+        const blob = await createBlobForFileName(fileName, payload);
         const writable = await handle.createWritable();
 
         await writable.write(blob);
@@ -4865,15 +4761,22 @@ async function writeSaveAsFile(defaultName) {
         return true;
     }
 
-    const requestedName = prompt("Dosya adı (.awc, .xls, .xlsx, .ods, .pdf)", `${defaultName}.awc`);
-    if (requestedName === null) return false;
+    const result = await showAppDialog({
+        title: "Farklı kaydet",
+        message: "Dosya adı ve biçimi:",
+        input: { value: defaultName, placeholder: "Dosya adı" },
+        select: { options: SAVE_FORMATS, value: "awc" },
+        confirmText: "Kaydet",
+        cancelText: "Vazgeç"
+    });
+    if (!result.confirmed) return false;
 
-    const safeName = sanitizeFileName(requestedName);
+    const safeName = sanitizeFileName(result.value.replace(/\.(awc|xls|xlsx|ods|pdf|csv)$/i, ""));
     if (!safeName) return false;
 
-    const fileName = /\.(awc|xls|xlsx|ods|pdf)$/i.test(safeName) ? safeName : `${safeName}.awc`;
+    const fileName = `${safeName}.${result.selected}`;
     const payload = createSavePayload();
-    const blob = createBlobForFileName(fileName, payload);
+    const blob = await createBlobForFileName(fileName, payload);
     downloadSaveFile(blob, fileName);
     updateNextSaveNumber(fileName);
     setCurrentWorkbookFile(fileName);
@@ -4881,33 +4784,41 @@ async function writeSaveAsFile(defaultName) {
 }
 
 async function saveWorkbook() {
-    const payload = createSavePayload();
-    const blob = createAvcBlob(payload);
-
     try {
         if (currentWorkbookFileHandle) {
+            const blob = createAwcBlob(createSavePayload());
             const writable = await currentWorkbookFileHandle.createWritable();
             await writable.write(blob);
             await writable.close();
             updateNextSaveNumber(currentWorkbookFileName);
+            showToast("Kaydedildi");
             return true;
         }
 
         const defaultName = getCurrentSaveBaseName();
-        const requestedName = prompt("Dosya adı", defaultName);
-        if (requestedName === null) return false;
+        let fileName = ensureSaveExtension(defaultName);
+        if (!("showSaveFilePicker" in window)) {
+            const result = await showAppDialog({
+                title: "Kaydet",
+                message: "Dosya adı:",
+                input: { value: defaultName },
+                confirmText: "Kaydet",
+                cancelText: "Vazgeç"
+            });
+            if (!result.confirmed) return false;
+            const safeName = sanitizeFileName(result.value);
+            if (!safeName) return false;
+            fileName = ensureSaveExtension(safeName);
+        }
 
-        const safeName = sanitizeFileName(requestedName);
-        if (!safeName) return false;
-
-        const fileName = ensureSaveExtension(safeName);
-        const result = await writeSaveFile(blob, fileName);
-        setCurrentWorkbookFile(result.fileName, result.handle);
-        updateNextSaveNumber(result.fileName);
+        const blob = createAwcBlob(createSavePayload());
+        const saved = await writeSaveFile(blob, fileName);
+        setCurrentWorkbookFile(saved.fileName, saved.handle);
+        updateNextSaveNumber(saved.fileName);
         return true;
     } catch (error) {
         if (error?.name !== "AbortError") {
-            alert("Dosya kaydedilemedi.");
+            showAppMessage("Dosya kaydedilemedi.", "Kaydetme hatası");
         }
         return false;
     }
@@ -4920,10 +4831,23 @@ async function saveWorkbookAs() {
         return await writeSaveAsFile(defaultName);
     } catch (error) {
         if (error?.name !== "AbortError") {
-            alert("Dosya kaydedilemedi.");
+            showAppMessage("Dosya kaydedilemedi.", "Kaydetme hatası");
         }
         return false;
     }
+}
+
+let toastTimer = null;
+
+function showToast(message) {
+    const toast = document.getElementById("app-toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.hidden = true;
+    }, 1800);
 }
 
 function createHistorySnapshot() {
@@ -5140,12 +5064,173 @@ function initData() {
     }
 }
 // RENDER TABLE FROM MODEL
-function renderTable() {
-    table.innerHTML = "";
-    table.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        hideContextMenu();
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+const SELECTION_CLASSES = [
+    "selected", "selection-handle-cell", "range-selected",
+    "selection-range", "selection-top", "selection-bottom", "selection-left", "selection-right",
+    "copied-range", "copied-top", "copied-bottom", "copied-left", "copied-right",
+    "move-target-cell", "move-target-range", "move-target-top", "move-target-bottom", "move-target-left", "move-target-right",
+    "selection-move-cursor"
+];
+
+/** Seçim aralıkları bir kez hesaplanır; hücre başına bütün tabloyu taramak gerekmez. */
+function createSelectionContext() {
+    return {
+        primary: selectionRange ? getNormalizedRange(selectionRange) : null,
+        extras: extraSelections.map(getNormalizedRange).filter(Boolean),
+        copied: copiedRange ? getNormalizedRange(copiedRange) : null,
+        moveTarget: getCellMoveTargetRange()
+    };
+}
+
+function pushRangeBoundaryClasses(classes, row, col, range, prefix) {
+    const visualRange = getVisualCellRange(row, col);
+    classes.push(`${prefix}-range`);
+    if (visualRange.minRow <= range.minRow) classes.push(`${prefix}-top`);
+    if (visualRange.maxRow >= range.maxRow) classes.push(`${prefix}-bottom`);
+    if (visualRange.minCol <= range.minCol) classes.push(`${prefix}-left`);
+    if (visualRange.maxCol >= range.maxCol) classes.push(`${prefix}-right`);
+}
+
+function getCellSelectionClasses(row, col, context) {
+    const classes = [];
+
+    if (selectedCell && selectedCell.row === row && selectedCell.col === col) {
+        classes.push("selected");
+        if (!context.primary && context.extras.length === 0) classes.push("selection-handle-cell");
+    }
+
+    if (context.primary && isCellInNormalizedRange(row, col, context.primary)) {
+        classes.push("range-selected");
+        pushRangeBoundaryClasses(classes, row, col, context.primary, "selection");
+        const visualRange = getVisualCellRange(row, col);
+        if (visualRange.maxRow === context.primary.maxRow && visualRange.maxCol === context.primary.maxCol) {
+            classes.push("selection-handle-cell");
+        }
+    }
+
+    context.extras.forEach((range) => {
+        if (isCellInNormalizedRange(row, col, range)) {
+            classes.push("range-selected");
+            pushRangeBoundaryClasses(classes, row, col, range, "selection");
+        }
     });
+
+    if (context.copied && isCellInNormalizedRange(row, col, context.copied)) {
+        const range = context.copied;
+        classes.push("copied-range");
+        if (row === range.minRow) classes.push("copied-top");
+        if (row === range.maxRow) classes.push("copied-bottom");
+        if (col === range.minCol) classes.push("copied-left");
+        if (col === range.maxCol) classes.push("copied-right");
+    }
+
+    if (context.moveTarget && isCellInNormalizedRange(row, col, context.moveTarget)) {
+        classes.push("move-target-cell");
+        pushRangeBoundaryClasses(classes, row, col, context.moveTarget, "move-target");
+    }
+
+    return classes;
+}
+
+function getColumnHeaderClasses(col) {
+    const classes = [];
+    if (isColumnHeaderActive(col)) classes.push("active-header");
+    if (moveSelectionState?.type === "column" && moveSelectionState.targetIndex === col) classes.push("move-target-header");
+    return classes;
+}
+
+function getRowHeaderClasses(row) {
+    const classes = [];
+    if (isRowHeaderActive(row)) classes.push("active-header");
+    if (moveSelectionState?.type === "row" && moveSelectionState.targetIndex === row) classes.push("move-target-header");
+    return classes;
+}
+
+/** Yalnız seçim değiştiğinde tabloyu yeniden kurmadan sınıfları günceller. */
+function renderSelection() {
+    if (!table.rows.length) {
+        renderTable();
+        return;
+    }
+
+    const context = createSelectionContext();
+    // Yalnız önceden işaretli hücrelere ve yeni seçim aralıklarına dokunulur.
+    const targets = new Set(decoratedCellElements);
+    const addRange = (range) => {
+        if (!range) return;
+        for (let r = Math.max(0, range.minRow); r <= Math.min(rowCount - 1, range.maxRow); r++) {
+            for (let c = Math.max(0, range.minCol); c <= Math.min(colCount - 1, range.maxCol); c++) {
+                const element = cellElements.get(`${r}:${c}`);
+                if (element) targets.add(element);
+            }
+        }
+    };
+    if (selectedCell) addRange(getVisualCellRange(selectedCell.row, selectedCell.col));
+    addRange(context.primary);
+    context.extras.forEach(addRange);
+    addRange(context.copied);
+    addRange(context.moveTarget);
+
+    const nextDecorated = new Set();
+    targets.forEach((td) => {
+        if (td.classList.contains("editing")) {
+            nextDecorated.add(td);
+            return;
+        }
+        td.classList.remove(...SELECTION_CLASSES);
+        const classes = getCellSelectionClasses(Number(td.dataset.row), Number(td.dataset.col), context);
+        if (classes.length) {
+            td.classList.add(...classes);
+            nextDecorated.add(td);
+        }
+    });
+    decoratedCellElements = nextDecorated;
+    table.querySelectorAll("th.column-header").forEach((th) => {
+        th.classList.remove("active-header", "move-target-header");
+        const classes = getColumnHeaderClasses(Number(th.dataset.col));
+        if (classes.length) th.classList.add(...classes);
+    });
+    table.querySelectorAll("th.row-header").forEach((th) => {
+        th.classList.remove("active-header", "move-target-header");
+        const classes = getRowHeaderClasses(Number(th.dataset.row));
+        if (classes.length) th.classList.add(...classes);
+    });
+    table.querySelector(".corner-header")?.classList.toggle("active-header", selectionMode === "all");
+
+    updateFormulaBar();
+    updateToolbarState();
+    updateStatusSummary();
+}
+
+function getCellSizeStyle(row, col, merge, zoomScale) {
+    if (merge) {
+        let width = 0;
+        for (let c = col; c < col + merge.colspan; c++) {
+            if (!hiddenCols.has(c)) width += colWidths[c] ?? DEFAULT_COL_WIDTH;
+        }
+        let height = 0;
+        for (let r = row; r < row + merge.rowspan; r++) {
+            if (isRowVisible(r)) height += rowHeights[r] ?? DEFAULT_ROW_HEIGHT;
+        }
+        const zoomedWidth = Math.max(24, Math.round(width * zoomScale));
+        const zoomedHeight = Math.max(18, Math.round(height * zoomScale));
+        return `width:${zoomedWidth}px;min-width:${zoomedWidth}px;max-width:${zoomedWidth}px;height:${zoomedHeight}px;`;
+    }
+
+    const width = Math.max(24, Math.round((colWidths[col] ?? DEFAULT_COL_WIDTH) * zoomScale));
+    const height = Math.max(18, Math.round((rowHeights[row] ?? DEFAULT_ROW_HEIGHT) * zoomScale));
+    return `width:${width}px;min-width:${width}px;max-width:${width}px;height:${height}px;`;
+}
+
+function renderTable() {
     clampFrozenPanes();
 
     const zoomScale = getZoomScale();
@@ -5157,7 +5242,7 @@ function renderTable() {
     let frozenLeft = rowHeaderWidth;
 
     for (let r = 0; r < frozenRows; r++) {
-        if (hiddenRows.has(r) || isRowHiddenByFilter(r)) continue;
+        if (!isRowVisible(r)) continue;
         frozenRowTops.set(r, frozenTop);
         frozenTop += Math.round((rowHeights[r] ?? DEFAULT_ROW_HEIGHT) * zoomScale);
     }
@@ -5167,494 +5252,407 @@ function renderTable() {
         frozenColLefts.set(c, frozenLeft);
         frozenLeft += Math.round((colWidths[c] ?? DEFAULT_COL_WIDTH) * zoomScale);
     }
-
-    const applyFrozenPosition = (element, row, col) => {
-        const hasFrozenRow = frozenRowTops.has(row);
-        const hasFrozenCol = frozenColLefts.has(col);
-        if (!hasFrozenRow && !hasFrozenCol) return;
-
-        element.classList.add("frozen-pane-cell");
-        element.style.position = "sticky";
-        if (hasFrozenRow) element.style.top = `${frozenRowTops.get(row)}px`;
-        if (hasFrozenCol) element.style.left = `${frozenColLefts.get(col)}px`;
-        element.style.zIndex = hasFrozenRow && hasFrozenCol ? "7" : hasFrozenRow ? "5" : "3";
-    };
     renderFreezeDividers(frozenTop, frozenLeft);
 
-    // HEADER
-    const headerRow = document.createElement("tr");
-    const cornerHeader = document.createElement("th");
-    cornerHeader.classList.add("corner-header");
-    if (selectionMode === "all") {
-        cornerHeader.classList.add("active-header");
-    }
-    cornerHeader.addEventListener("click", () => {
-        if (isEditing) {
-            exitEditMode(true);
-        }
-        selectAllCells();
-    });
-    cornerHeader.addEventListener("contextmenu", (e) => {
-        if (isEditing) {
-            exitEditMode(true);
-        }
-        selectAllCells();
-        showContextMenu(e, { type: "all" });
-    });
-    headerRow.appendChild(cornerHeader);
+    const selectionContext = createSelectionContext();
+    const filter = normalizeFilter(activeFilter);
+    const highlightChart = activeChart?.config ? activeChart : null;
+    const html = [];
 
+    // Başlık satırı
+    html.push(`<tr><th class="corner-header${selectionMode === "all" ? " active-header" : ""}" title="Tümünü seç"></th>`);
     for (let c = 0; c < colCount; c++) {
         if (hiddenCols.has(c)) continue;
 
-        const th = document.createElement("th");
-        th.classList.add("column-header");
-        th.dataset.col = c;
-        setColumnWidth(th, c);
-        th.textContent = getColumnLabel(c);
-        const resizeHandle = document.createElement("span");
-        resizeHandle.classList.add("col-resize-handle");
-        resizeHandle.addEventListener("mousedown", (e) => {
-            startColumnResize(e, c);
-        });
-        resizeHandle.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
-        resizeHandle.addEventListener("dblclick", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            autoFitColumn(c);
-        });
-        th.appendChild(resizeHandle);
-        if (isColumnHeaderActive(c)) {
-            th.classList.add("active-header");
-        }
-        if (moveSelectionState?.type === "column" && moveSelectionState.targetIndex === c) {
-            th.classList.add("move-target-header");
-        }
-        if (hasHiddenColAfter(c)) {
-            th.classList.add("hidden-col-after");
-        }
-        if (hasHiddenColBefore(c)) {
-            th.classList.add("hidden-col-before");
-        }
+        const classes = ["column-header", ...getColumnHeaderClasses(c)];
+        if (hasHiddenColAfter(c)) classes.push("hidden-col-after");
+        if (hasHiddenColBefore(c)) classes.push("hidden-col-before");
+        const width = Math.max(24, Math.round((colWidths[c] ?? DEFAULT_COL_WIDTH) * zoomScale));
+        let style = `width:${width}px;min-width:${width}px;max-width:${width}px;`;
         if (frozenColLefts.has(c)) {
-            th.classList.add("frozen-pane-header");
-            th.style.left = `${frozenColLefts.get(c)}px`;
-            th.style.zIndex = "6";
+            classes.push("frozen-pane-header");
+            style += `left:${frozenColLefts.get(c)}px;z-index:6;`;
         }
-        th.addEventListener("mousedown", (e) => {
-            if (e.button !== 0 || resizeState || e.shiftKey || e.ctrlKey || e.metaKey) return;
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            if (selectionMode === "column" && isColumnInColumnSelection(c)) {
-                startMoveSelection("column", c);
-                e.preventDefault();
-                return;
-            }
-            startHeaderSelection("column", c);
-            e.preventDefault();
-        });
-        th.addEventListener("mouseenter", () => {
-            updateMoveSelection("column", c);
-            updateHeaderSelection("column", c);
-        });
-        th.addEventListener("click", (e) => {
-            if (suppressClickAfterMove) {
-                suppressClickAfterMove = false;
-                e.preventDefault();
-                return;
-            }
-            if (headerSelectionState?.moved) {
-                e.preventDefault();
-                return;
-            }
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            selectColumn(c, e);
-        });
-        th.addEventListener("contextmenu", (e) => {
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            if (!(selectionMode === "column" && isColumnInColumnSelection(c))) {
-                selectColumn(c);
-            }
-            showContextMenu(e, { type: "column", col: c });
-        });
-        headerRow.appendChild(th);
+        html.push(`<th class="${classes.join(" ")}" data-col="${c}" style="${style}">${getColumnLabel(c)}<span class="col-resize-handle"></span></th>`);
     }
-    table.appendChild(headerRow);
+    html.push("</tr>");
 
-    // ROWS
+    // Satırlar
     for (let r = 0; r < rowCount; r++) {
-        if (hiddenRows.has(r)) continue;
-        if (isRowHiddenByFilter(r)) continue;
+        if (hiddenRows.has(r) || (filter && isRowHiddenByFilter(r))) continue;
 
-        const tr = document.createElement("tr");
-
-        const rowHeader = document.createElement("th");
-        rowHeader.classList.add("row-header");
-        rowHeader.dataset.row = r;
-        setRowHeight(rowHeader, r);
-        rowHeader.textContent = r + 1;
-        const resizeHandle = document.createElement("span");
-        resizeHandle.classList.add("row-resize-handle");
-        resizeHandle.addEventListener("mousedown", (e) => {
-            startRowResize(e, r);
-        });
-        resizeHandle.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
-        resizeHandle.addEventListener("dblclick", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            autoFitRow(r);
-        });
-        rowHeader.appendChild(resizeHandle);
-        if (isRowHeaderActive(r)) {
-            rowHeader.classList.add("active-header");
-        }
-        if (moveSelectionState?.type === "row" && moveSelectionState.targetIndex === r) {
-            rowHeader.classList.add("move-target-header");
-        }
-        if (hasHiddenRowAfter(r)) {
-            rowHeader.classList.add("hidden-row-after");
-        }
-        if (hasHiddenRowBefore(r)) {
-            rowHeader.classList.add("hidden-row-before");
-        }
+        const rowHeaderClasses = ["row-header", ...getRowHeaderClasses(r)];
+        if (hasHiddenRowAfter(r)) rowHeaderClasses.push("hidden-row-after");
+        if (hasHiddenRowBefore(r)) rowHeaderClasses.push("hidden-row-before");
+        const rowHeight = Math.max(18, Math.round((rowHeights[r] ?? DEFAULT_ROW_HEIGHT) * zoomScale));
+        let rowHeaderStyle = `height:${rowHeight}px;`;
         if (frozenRowTops.has(r)) {
-            rowHeader.classList.add("frozen-pane-header");
-            rowHeader.style.top = `${frozenRowTops.get(r)}px`;
-            rowHeader.style.zIndex = "7";
+            rowHeaderClasses.push("frozen-pane-header");
+            rowHeaderStyle += `top:${frozenRowTops.get(r)}px;z-index:7;`;
         }
-        rowHeader.addEventListener("mousedown", (e) => {
-            if (e.button !== 0 || resizeState || e.shiftKey || e.ctrlKey || e.metaKey) return;
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            if (selectionMode === "row" && isRowInRowSelection(r)) {
-                startMoveSelection("row", r);
-                e.preventDefault();
-                return;
-            }
-            startHeaderSelection("row", r);
-            e.preventDefault();
-        });
-        rowHeader.addEventListener("mouseenter", () => {
-            updateMoveSelection("row", r);
-            updateHeaderSelection("row", r);
-        });
-        rowHeader.addEventListener("click", (e) => {
-            if (suppressClickAfterMove) {
-                suppressClickAfterMove = false;
-                e.preventDefault();
-                return;
-            }
-            if (headerSelectionState?.moved) {
-                e.preventDefault();
-                return;
-            }
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            selectRow(r, e);
-        });
-        rowHeader.addEventListener("contextmenu", (e) => {
-            if (isEditing) {
-                exitEditMode(true);
-            }
-            if (!(selectionMode === "row" && isRowInRowSelection(r))) {
-                selectRow(r);
-            }
-            showContextMenu(e, { type: "row", row: r });
-        });
-        tr.appendChild(rowHeader);
+        html.push(`<tr><th class="${rowHeaderClasses.join(" ")}" data-row="${r}" style="${rowHeaderStyle}">${r + 1}<span class="row-resize-handle"></span></th>`);
 
+        const rowData = tableData[r];
         for (let c = 0; c < colCount; c++) {
             if (hiddenCols.has(c)) continue;
-            if (tableData[r][c].mergedTo) continue;
+            const cell = rowData[c];
+            if (cell.mergedTo) continue;
 
-            const td = document.createElement("td");
-            // data binding
-            td.dataset.row = r;
-            td.dataset.col = c;
-            const merge = tableData[r][c].merge;
+            const cellStyle = getCellStyle(cell);
+            const classes = getCellSelectionClasses(r, c, selectionContext);
+            const merge = cell.merge;
+            let attributes = `data-row="${r}" data-col="${c}" tabindex="-1"`;
             if (merge) {
-                td.colSpan = merge.colspan;
-                td.rowSpan = merge.rowspan;
-                td.classList.add("merged-cell");
-                const width = colWidths
-                    .slice(c, c + merge.colspan)
-                    .reduce((sum, value) => sum + (value ?? DEFAULT_COL_WIDTH), 0);
-                const height = rowHeights
-                    .slice(r, r + merge.rowspan)
-                    .reduce((sum, value) => sum + (value ?? DEFAULT_ROW_HEIGHT), 0);
-                const zoomedWidth = Math.max(24, Math.round(width * getZoomScale()));
-                const zoomedHeight = Math.max(18, Math.round(height * getZoomScale()));
-                td.style.width = `${zoomedWidth}px`;
-                td.style.minWidth = `${zoomedWidth}px`;
-                td.style.maxWidth = `${zoomedWidth}px`;
-                td.style.height = `${zoomedHeight}px`;
-            } else {
-                setColumnWidth(td, c);
-                setRowHeight(td, r);
+                attributes += ` colspan="${merge.colspan}" rowspan="${merge.rowspan}"`;
+                classes.push("merged-cell");
             }
 
-            td.textContent = formatCellDisplayValue(tableData[r][c]);
-            td.contentEditable = false;
-            td.tabIndex = -1;
-            const cellStyle = getCellStyle(tableData[r][c]);
-            td.style.fontWeight = cellStyle.bold ? "700" : "400";
-            td.style.fontStyle = cellStyle.italic ? "italic" : "normal";
-            const textDecorations = [];
-            if (cellStyle.underline) textDecorations.push("underline");
-            if (cellStyle.strikeThrough) textDecorations.push("line-through");
-            td.style.textDecoration = textDecorations.length ? textDecorations.join(" ") : "none";
-            td.style.fontSize = `${Math.max(6, Math.round(Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, Number(cellStyle.fontSize) || DEFAULT_FONT_SIZE)) * getZoomScale()))}px`;
-            td.style.color = normalizeColorValue(cellStyle.color, "#202124");
-            td.style.textAlign = cellStyle.horizontalAlign;
-            td.style.verticalAlign = cellStyle.verticalAlign;
-            if (cellStyle.backgroundColor) {
-                td.style.backgroundColor = normalizeColorValue(cellStyle.backgroundColor, "#fff2cc");
-            }
-            applyFrozenPosition(td, r, c);
-            if (
-                activeFilter &&
-                r === activeFilter.range.minRow &&
-                c >= activeFilter.range.minCol &&
-                c <= activeFilter.range.maxCol
-            ) {
-                td.classList.add("filter-header-cell");
-                if (c === activeFilter.column && activeFilter.query) {
-                    td.classList.add("filter-active-cell");
-                }
-                const filterButton = document.createElement("button");
-                filterButton.type = "button";
-                filterButton.className = "cell-filter-btn";
-                filterButton.title = "Filtre seçenekleri";
-                filterButton.innerHTML = '<img src="icons/filter.svg" alt="" />';
-                filterButton.addEventListener("mousedown", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                });
-                filterButton.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    showFilterPopup(filterButton, c);
-                });
-                td.appendChild(filterButton);
-            }
-            const borders = getCellBorders(tableData[r][c]);
-            if (borders.top) td.classList.add("cell-border-top");
-            if (borders.right) td.classList.add("cell-border-right");
-            if (borders.bottom) td.classList.add("cell-border-bottom");
-            if (borders.left) td.classList.add("cell-border-left");
+            let style = getCellSizeStyle(r, c, merge, zoomScale);
+            const decorations = [];
+            if (cellStyle.underline) decorations.push("underline");
+            if (cellStyle.strikeThrough) decorations.push("line-through");
+            const fontSize = Math.max(6, Math.round(Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, Number(cellStyle.fontSize) || DEFAULT_FONT_SIZE)) * zoomScale));
+            if (cellStyle.bold) style += "font-weight:700;";
+            if (cellStyle.italic) style += "font-style:italic;";
+            if (decorations.length) style += `text-decoration:${decorations.join(" ")};`;
+            if (fontSize !== DEFAULT_FONT_SIZE) style += `font-size:${fontSize}px;`;
+            const color = normalizeColorValue(cellStyle.color, "#202124");
+            if (color !== "#202124") style += `color:${color};`;
+            if (cellStyle.horizontalAlign !== "left") style += `text-align:${cellStyle.horizontalAlign};`;
+            if (cellStyle.verticalAlign !== "middle") style += `vertical-align:${cellStyle.verticalAlign};`;
 
-            // SELECTED STATE -> CSS
-            if (
-                selectedCell &&
-                selectedCell.row === r &&
-                selectedCell.col === c
-            ) {
-                td.classList.add("selected");
-                if (!selectionRange && extraSelections.length === 0) {
-                    td.classList.add("selection-handle-cell");
-                }
+            let background = cellStyle.backgroundColor ? normalizeColorValue(cellStyle.backgroundColor, "") : "";
+            if (highlightChart && isCellInRange(r, c, highlightChart.config.xRange)) {
+                background = highlightChart.color?.labelHighlight ?? "#e6f4ea";
+            }
+            if (highlightChart && isCellInRange(r, c, highlightChart.config.yRange)) {
+                background = highlightChart.color?.dataHighlight ?? "#ceead6";
+            }
+            if (background) style += `background-color:${background};`;
+
+            const hasFrozenRow = frozenRowTops.has(r);
+            const hasFrozenCol = frozenColLefts.has(c);
+            if (hasFrozenRow || hasFrozenCol) {
+                classes.push("frozen-pane-cell");
+                style += "position:sticky;";
+                if (hasFrozenRow) style += `top:${frozenRowTops.get(r)}px;`;
+                if (hasFrozenCol) style += `left:${frozenColLefts.get(c)}px;`;
+                style += `z-index:${hasFrozenRow && hasFrozenCol ? 7 : hasFrozenRow ? 5 : 3};`;
             }
 
-            // RANGE SELECTED STATE (Shift + seçim)
-            if (selectionRange) {
-                const range = getNormalizedRange(selectionRange);
+            const borders = getCellBorders(cell);
+            if (borders.top) classes.push("cell-border-top");
+            if (borders.right) classes.push("cell-border-right");
+            if (borders.bottom) classes.push("cell-border-bottom");
+            if (borders.left) classes.push("cell-border-left");
 
-                if (isCellInNormalizedRange(r, c, range)) {
-                    td.classList.add("range-selected");
-                    addRangeBoundaryClasses(td, r, c, range, "selection");
-                    const visualRange = getVisualCellRange(r, c);
-                    if (visualRange.maxRow === range.maxRow && visualRange.maxCol === range.maxCol) {
-                        td.classList.add("selection-handle-cell");
-                    }
-                }
+            const displayText = formatCellDisplayValue(cell);
+            if (cell.formula && AwFormula.isErrorText(cell.value)) classes.push("cell-error");
+            if (cell.note) {
+                classes.push("has-note");
+                attributes += ` title="${escapeHtml(cell.note)}"`;
             }
 
-            extraSelections.forEach((extraRange) => {
-                const range = getNormalizedRange(extraRange);
-
-                if (isCellInNormalizedRange(r, c, range)) {
-                    td.classList.add("range-selected");
-                    addRangeBoundaryClasses(td, r, c, range, "selection");
-                }
-            });
-
-            if (copiedRange) {
-                const range = getNormalizedRange(copiedRange);
-
-                if (isCellInNormalizedRange(r, c, range)) {
-                    td.classList.add("copied-range");
-                    if (r === range.minRow) td.classList.add("copied-top");
-                    if (r === range.maxRow) td.classList.add("copied-bottom");
-                    if (c === range.minCol) td.classList.add("copied-left");
-                    if (c === range.maxCol) td.classList.add("copied-right");
-                }
+            let filterButton = "";
+            if (filter && r === filter.range.minRow && c >= filter.range.minCol && c <= filter.range.maxCol) {
+                classes.push("filter-header-cell");
+                if (c === filter.column && filter.query) classes.push("filter-active-cell");
+                filterButton = `<button type="button" class="cell-filter-btn" data-filter-col="${c}" title="Filtre seçenekleri"><img src="icons/filter.svg" alt="" /></button>`;
             }
 
-            const moveTargetRange = getCellMoveTargetRange();
-            if (moveTargetRange && isCellInNormalizedRange(r, c, moveTargetRange)) {
-                td.classList.add("move-target-cell");
-                addRangeBoundaryClasses(td, r, c, moveTargetRange, "move-target");
-            }
-
-            // Grafik veri aralığı vurgusu.
-            if (activeChart?.config && isCellInRange(r, c, activeChart.config.xRange)) {
-                td.style.backgroundColor = activeChart.color?.labelHighlight ?? "#e6f4ea";
-            }
-            if (activeChart?.config && isCellInRange(r, c, activeChart.config.yRange)) {
-                td.style.backgroundColor = activeChart.color?.dataHighlight ?? "#ceead6";
-            }
-
-
-            // EVENT LISTENERS
-            td.addEventListener("contextmenu", (e) => {
-                if (isEditing) {
-                    exitEditMode(true);
-                }
-
-                if (!isCellInCurrentSelection(r, c)) {
-                    selectedCell = { row: r, col: c };
-                    selectionRange = null;
-                    selectionMode = "cell";
-                    extraSelections = [];
-                    renderTable();
-                }
-
-                showContextMenu(e, { type: "cell", row: r, col: c });
-            });
-
-            td.addEventListener("mousedown", (e) => {
-                if (e.button !== 0 || isEditing || resizeState) return;
-
-                if (e.detail > 1) {
-                    clearClipboardState();
-                    selectedCell = { row: r, col: c };
-                    selectionRange = null;
-                    selectionMode = "cell";
-                    extraSelections = [];
-                    renderTable();
-                    enterEditMode(r, c);
-                    e.preventDefault();
-                    return;
-                }
-
-                if (e.shiftKey || e.ctrlKey || e.metaKey) return;
-
-                if (
-                    isCellInCurrentSelection(r, c) &&
-                    isNearSelectionEdge(e, e.currentTarget, r, c) &&
-                    startCellMove(r, c)
-                ) {
-                    e.preventDefault();
-                    return;
-                }
-
-                isMouseSelecting = true;
-                mouseSelectionMoved = false;
-                selectedCell = { row: r, col: c };
-                selectionRange = null;
-                selectionMode = "cell";
-                extraSelections = [];
-                renderTable();
-                focusSelectedCell();
-                e.preventDefault();
-            });
-
-            td.addEventListener("mouseenter", () => {
-                updateCellMoveTarget(r, c);
-                if (!isMouseSelecting || !selectedCell) return;
-                if (selectedCell.row === r && selectedCell.col === c) return;
-
-                mouseSelectionMoved = true;
-                selectionMode = "range";
-                extraSelections = [];
-                selectionRange = {
-                    start: { ...selectedCell },
-                    end: { row: r, col: c }
-                };
-                renderTable();
-                focusSelectedCell();
-            });
-
-            td.addEventListener("mousemove", (e) => {
-                if (isEditing || resizeState || moveSelectionState || isMouseSelecting) return;
-                e.currentTarget.classList.toggle(
-                    "selection-move-cursor",
-                    isCellInCurrentSelection(r, c) && isNearSelectionEdge(e, e.currentTarget, r, c)
-                );
-            });
-
-            td.addEventListener("mouseleave", (e) => {
-                e.currentTarget.classList.remove("selection-move-cursor");
-            });
-
-            td.addEventListener("click", (e) => {
-                if (suppressClickAfterMove) {
-                    suppressClickAfterMove = false;
-                    e.preventDefault();
-                    return;
-                }
-                if (mouseSelectionMoved) {
-                    mouseSelectionMoved = false;
-                    e.preventDefault();
-                    return;
-                }
-
-                if (isEditing) {
-                    exitEditMode(true);
-                }
-
-                if ((e.ctrlKey || e.metaKey) && selectedCell) {
-                    addExtraCellSelection(r, c);
-                    selectionMode = "range";
-                } else if (e.shiftKey && selectedCell) {
-                    selectionMode = "range";
-                    extraSelections = [];
-                    selectionRange = {
-                        start: { ...selectedCell },
-                        end: { row: r, col: c }
-                    };
-                } else {
-                    selectedCell = { row: r, col: c };
-                    selectionRange = null;
-                    selectionMode = "cell";
-                    extraSelections = [];
-                }
-
-                renderTable();
-                focusSelectedCell();
-            });
-
-            td.addEventListener("dblclick", () => {
-                clearClipboardState();
-                selectedCell = { row: r, col: c };
-                selectionRange = null;
-                selectionMode = "cell";
-                extraSelections = [];
-                renderTable();
-                enterEditMode(r, c);
-            });
-
-            tr.appendChild(td);
+            html.push(`<td ${attributes}${classes.length ? ` class="${classes.join(" ")}"` : ""} style="${style}">${escapeHtml(displayText)}${filterButton}</td>`);
         }
-
-        table.appendChild(tr);
+        html.push("</tr>");
     }
+
+    table.innerHTML = html.join("");
+    indexCellElements();
 
     updateFormulaBar();
     updateToolbarState();
     updateStatusSummary();
     scheduleAutoSave();
 }
+
+/* Tablo olayları: hücre başına dinleyici yerine tabloda tek bir dinleyici (olay yetkilendirme). */
+let lastHoverKey = null;
+
+function getEventCellPosition(td) {
+    return { row: Number(td.dataset.row), col: Number(td.dataset.col) };
+}
+
+function selectSingleCell(row, col) {
+    selectedCell = { row, col };
+    selectionRange = null;
+    selectionMode = "cell";
+    extraSelections = [];
+}
+
+function handleTableMouseDown(e) {
+    hideColorPaletteMenus();
+
+    const resizeHandle = e.target.closest(".col-resize-handle, .row-resize-handle");
+    if (resizeHandle) {
+        if (e.button !== 0) return;
+        const th = resizeHandle.closest("th");
+        if (resizeHandle.classList.contains("col-resize-handle")) startColumnResize(e, Number(th.dataset.col));
+        else startRowResize(e, Number(th.dataset.row));
+        return;
+    }
+
+    if (e.target.closest(".cell-filter-btn")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+
+    const th = e.target.closest("th");
+    if (th) {
+        if (e.button !== 0 || resizeState || e.shiftKey || e.ctrlKey || e.metaKey) return;
+        if (th.classList.contains("corner-header")) return;
+        if (isEditing) exitEditMode(true);
+
+        if (th.classList.contains("column-header")) {
+            const col = Number(th.dataset.col);
+            if (selectionMode === "column" && isColumnInColumnSelection(col)) startMoveSelection("column", col);
+            else startHeaderSelection("column", col);
+        } else if (th.classList.contains("row-header")) {
+            const row = Number(th.dataset.row);
+            if (selectionMode === "row" && isRowInRowSelection(row)) startMoveSelection("row", row);
+            else startHeaderSelection("row", row);
+        }
+        e.preventDefault();
+        return;
+    }
+
+    const td = e.target.closest("td[data-row]");
+    if (!td || e.button !== 0 || resizeState) return;
+    const { row: r, col: c } = getEventCellPosition(td);
+
+    if (isEditing) {
+        if (td.classList.contains("editing")) return;
+        if (canInsertFormulaReference()) {
+            e.preventDefault();
+            suppressClickAfterPoint = true;
+            startFormulaPointReference(r, c);
+        }
+        return;
+    }
+
+    if (e.detail > 1) {
+        clearClipboardState();
+        selectSingleCell(r, c);
+        renderSelection();
+        enterEditMode(r, c);
+        e.preventDefault();
+        return;
+    }
+
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return;
+
+    if (isCellInCurrentSelection(r, c) && isNearSelectionEdge(e, td, r, c) && startCellMove(r, c)) {
+        e.preventDefault();
+        return;
+    }
+
+    isMouseSelecting = true;
+    mouseSelectionMoved = false;
+    selectSingleCell(r, c);
+    renderSelection();
+    focusSelectedCell();
+    e.preventDefault();
+}
+
+function handleTableMouseOver(e) {
+    const target = e.target.closest("td[data-row], th.column-header, th.row-header");
+    if (!target) return;
+    const key = target.tagName === "TD"
+        ? `${target.dataset.row}:${target.dataset.col}`
+        : `${target.classList.contains("column-header") ? "c" : "r"}${target.dataset.col ?? target.dataset.row}`;
+    if (key === lastHoverKey) return;
+    lastHoverKey = key;
+
+    if (target.classList.contains("column-header")) {
+        const col = Number(target.dataset.col);
+        updateMoveSelection("column", col);
+        updateHeaderSelection("column", col);
+        return;
+    }
+    if (target.classList.contains("row-header")) {
+        const row = Number(target.dataset.row);
+        updateMoveSelection("row", row);
+        updateHeaderSelection("row", row);
+        return;
+    }
+
+    const { row: r, col: c } = getEventCellPosition(target);
+    if (formulaPointState?.dragging) {
+        updateFormulaPointReference(r, c);
+        return;
+    }
+    updateCellMoveTarget(r, c);
+    if (!isMouseSelecting || !selectedCell) return;
+    if (selectedCell.row === r && selectedCell.col === c && !selectionRange) return;
+
+    mouseSelectionMoved = true;
+    selectionMode = "range";
+    extraSelections = [];
+    selectionRange = {
+        start: { ...selectedCell },
+        end: { row: r, col: c }
+    };
+    renderSelection();
+    focusSelectedCell();
+}
+
+function handleTableMouseMove(e) {
+    const td = e.target.closest("td[data-row]");
+    if (!td || isEditing || resizeState || moveSelectionState || isMouseSelecting) return;
+    const { row: r, col: c } = getEventCellPosition(td);
+    td.classList.toggle("selection-move-cursor", isCellInCurrentSelection(r, c) && isNearSelectionEdge(e, td, r, c));
+}
+
+function handleTableMouseOut(e) {
+    const td = e.target.closest("td[data-row]");
+    if (td && !td.contains(e.relatedTarget)) td.classList.remove("selection-move-cursor");
+    if (!table.contains(e.relatedTarget)) lastHoverKey = null;
+}
+
+function handleTableClick(e) {
+    if (e.target.closest(".col-resize-handle, .row-resize-handle")) {
+        e.stopPropagation();
+        return;
+    }
+
+    const filterButton = e.target.closest(".cell-filter-btn");
+    if (filterButton) {
+        e.preventDefault();
+        e.stopPropagation();
+        showFilterPopup(filterButton, Number(filterButton.dataset.filterCol));
+        return;
+    }
+
+    if (suppressClickAfterPoint) {
+        suppressClickAfterPoint = false;
+        return;
+    }
+
+    const th = e.target.closest("th");
+    if (th) {
+        if (suppressClickAfterMove) {
+            suppressClickAfterMove = false;
+            e.preventDefault();
+            return;
+        }
+        if (headerSelectionState?.moved) {
+            e.preventDefault();
+            return;
+        }
+        if (isEditing) exitEditMode(true);
+        if (th.classList.contains("corner-header")) selectAllCells();
+        else if (th.classList.contains("column-header")) selectColumn(Number(th.dataset.col), e);
+        else if (th.classList.contains("row-header")) selectRow(Number(th.dataset.row), e);
+        return;
+    }
+
+    const td = e.target.closest("td[data-row]");
+    if (!td || td.classList.contains("editing")) return;
+    const { row: r, col: c } = getEventCellPosition(td);
+
+    if (suppressClickAfterMove) {
+        suppressClickAfterMove = false;
+        e.preventDefault();
+        return;
+    }
+    if (mouseSelectionMoved) {
+        mouseSelectionMoved = false;
+        e.preventDefault();
+        return;
+    }
+
+    if (isEditing) exitEditMode(true);
+
+    if ((e.ctrlKey || e.metaKey) && selectedCell) {
+        addExtraCellSelection(r, c);
+        selectionMode = "range";
+    } else if (e.shiftKey && selectedCell) {
+        selectionMode = "range";
+        extraSelections = [];
+        selectionRange = {
+            start: { ...selectedCell },
+            end: { row: r, col: c }
+        };
+    } else {
+        selectSingleCell(r, c);
+    }
+
+    renderSelection();
+    focusSelectedCell();
+}
+
+function handleTableDoubleClick(e) {
+    const resizeHandle = e.target.closest(".col-resize-handle, .row-resize-handle");
+    if (resizeHandle) {
+        e.preventDefault();
+        e.stopPropagation();
+        const th = resizeHandle.closest("th");
+        if (resizeHandle.classList.contains("col-resize-handle")) autoFitColumn(Number(th.dataset.col));
+        else autoFitRow(Number(th.dataset.row));
+        return;
+    }
+
+    const td = e.target.closest("td[data-row]");
+    if (!td || isEditing) return;
+    const { row: r, col: c } = getEventCellPosition(td);
+    clearClipboardState();
+    selectSingleCell(r, c);
+    renderSelection();
+    enterEditMode(r, c);
+}
+
+function handleTableContextMenu(e) {
+    e.preventDefault();
+    const th = e.target.closest("th");
+    if (th) {
+        if (isEditing) exitEditMode(true);
+        if (th.classList.contains("corner-header")) {
+            selectAllCells();
+            showContextMenu(e, { type: "all" });
+        } else if (th.classList.contains("column-header")) {
+            const col = Number(th.dataset.col);
+            if (!(selectionMode === "column" && isColumnInColumnSelection(col))) selectColumn(col);
+            showContextMenu(e, { type: "column", col });
+        } else if (th.classList.contains("row-header")) {
+            const row = Number(th.dataset.row);
+            if (!(selectionMode === "row" && isRowInRowSelection(row))) selectRow(row);
+            showContextMenu(e, { type: "row", row });
+        }
+        return;
+    }
+
+    const td = e.target.closest("td[data-row]");
+    if (!td) {
+        hideContextMenu();
+        return;
+    }
+    if (td.classList.contains("editing")) return;
+    if (isEditing) exitEditMode(true);
+
+    const { row: r, col: c } = getEventCellPosition(td);
+    if (!isCellInCurrentSelection(r, c)) {
+        selectSingleCell(r, c);
+        renderSelection();
+    }
+    showContextMenu(e, { type: "cell", row: r, col: c });
+}
+
+table.addEventListener("mousedown", handleTableMouseDown);
+table.addEventListener("mouseover", handleTableMouseOver);
+table.addEventListener("mousemove", handleTableMouseMove);
+table.addEventListener("mouseout", handleTableMouseOut);
+table.addEventListener("click", handleTableClick);
+table.addEventListener("dblclick", handleTableDoubleClick);
+table.addEventListener("contextmenu", handleTableContextMenu);
 
 function setupToolbarCarousel() {
     if (!toolbarGroup || toolbarGroup.dataset.carouselReady === "true") return;
@@ -5804,15 +5802,11 @@ fileMenuBtn?.addEventListener("mouseenter", () => {
     if (hasOpenTextMenu()) openTextMenu("file");
 });
 
-openFileBtn?.addEventListener("click", async () => {
+openFileBtn?.addEventListener("click", runOpenWorkbook);
+
+printFileBtn?.addEventListener("click", () => {
     hideFileMenu();
-    try {
-        await openWorkbook();
-    } catch (error) {
-        if (error?.name !== "AbortError") {
-            alert(error?.message || "Dosya açılamadı.");
-        }
-    }
+    printActiveSheet();
 });
 
 newFileBtn?.addEventListener("click", () => {
@@ -5827,7 +5821,7 @@ openFileInput?.addEventListener("change", async () => {
     try {
         await openWorkbookFile(file);
     } catch (error) {
-        alert(error?.message || "Dosya açılamadı.");
+        showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
     }
 });
 
@@ -5874,17 +5868,17 @@ menuRedoBtn?.addEventListener("click", () => {
 
 menuCutBtn?.addEventListener("click", () => {
     hideEditMenu();
-    cutSelection();
+    copyFromMenu("cut");
 });
 
 menuCopyBtn?.addEventListener("click", () => {
     hideEditMenu();
-    copySelection();
+    copyFromMenu("copy");
 });
 
 menuPasteBtn?.addEventListener("click", () => {
     hideEditMenu();
-    pasteClipboard();
+    pasteFromMenu();
 });
 
 menuFindBtn?.addEventListener("click", () => {
@@ -5961,6 +5955,85 @@ formatMenuBtn?.addEventListener("click", (e) => {
 formatMenuBtn?.addEventListener("mouseenter", () => {
     if (hasOpenTextMenu()) openTextMenu("format");
 });
+
+// Fare başka bir menü başlığına gelince menü açılır; hemen ardından gelen tıklama onu kapatmasın.
+document.querySelector(".text-menu")?.addEventListener("click", (e) => {
+    if (e.target.closest(".menu-shell > button") && performance.now() - textMenuOpenedAt < 500) {
+        e.stopPropagation();
+    }
+}, true);
+
+helpMenuBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasOpen = Boolean(helpMenu && !helpMenu.hidden);
+    openTextMenu(wasOpen ? null : "help");
+});
+
+helpMenuBtn?.addEventListener("mouseenter", () => {
+    if (hasOpenTextMenu()) openTextMenu("help");
+});
+
+helpMenu?.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-help-action]");
+    if (!button) return;
+    e.stopPropagation();
+    hideHelpMenu();
+    if (button.dataset.helpAction === "functions") showFunctionHelp();
+    if (button.dataset.helpAction === "shortcuts") showShortcutHelp();
+});
+
+const FUNCTION_HELP = [
+    ["TOPLA / SUM", "=TOPLA(A1:A10)", "Sayıları toplar."],
+    ["ORTALAMA / AVERAGE", "=ORTALAMA(B2:B30)", "Ortalamayı bulur."],
+    ["MİN, MAK / MIN, MAX", "=MAK(B2:B30)", "En küçük / en büyük değer."],
+    ["BAĞ_DEĞ_SAY / COUNT", "=BAĞ_DEĞ_SAY(B2:B30)", "Sayı içeren hücreleri sayar."],
+    ["BAĞ_DEĞ_DOLU_SAY / COUNTA", "=BAĞ_DEĞ_DOLU_SAY(A2:A30)", "Boş olmayan hücreleri sayar."],
+    ["EĞER / IF", "=EĞER(B2>=50;\"Geçti\";\"Kaldı\")", "Koşula göre değer verir."],
+    ["EĞERSAY / COUNTIF", "=EĞERSAY(B2:B30;\">=50\")", "Koşulu sağlayanları sayar."],
+    ["ETOPLA / SUMIF", "=ETOPLA(A2:A30;\"Ali\";B2:B30)", "Koşulu sağlayanları toplar."],
+    ["EĞERORTALAMA / AVERAGEIF", "=EĞERORTALAMA(B2:B30;\">0\")", "Koşulu sağlayanların ortalaması."],
+    ["ÇOKEĞERSAY, ÇOKETOPLA", "=ÇOKEĞERSAY(B2:B30;\">=50\";C2:C30;\"9-A\")", "Birden çok koşul."],
+    ["YUVARLA / ROUND", "=YUVARLA(B2;2)", "Basamağa yuvarlar (YUKARIYUVARLA, AŞAĞIYUVARLA)."],
+    ["VE, YADA, DEĞİL / AND, OR, NOT", "=VE(B2>=50;C2>=50)", "Mantıksal işlemler."],
+    ["EĞERHATA / IFERROR", "=EĞERHATA(A1/B1;0)", "Hata yerine başka değer gösterir."],
+    ["DÜŞEYARA / VLOOKUP", "=DÜŞEYARA(\"Ayşe\";A2:C30;3;YANLIŞ)", "Tabloda arar (YATAYARA, KAÇINCI, İNDİS)."],
+    ["RANK, BÜYÜK, KÜÇÜK", "=RANK(B2;B$2:B$30)", "Sıralama ve k. büyük/küçük değer."],
+    ["ORTANCA, STDSAPMA", "=ORTANCA(B2:B30)", "Ortanca ve standart sapma."],
+    ["MUTLAK, KAREKÖK, KUVVET, MOD, TAMSAYI, Pİ", "=KAREKÖK(16)", "Matematik işlevleri."],
+    ["BİRLEŞTİR, SOLDAN, SAĞDAN, PARÇAAL", "=BİRLEŞTİR(A2;\" \";B2)", "Metin işlevleri (UZUNLUK, BÜYÜKHARF, KÜÇÜKHARF, KIRP)."],
+    ["BUGÜN, ŞİMDİ", "=BUGÜN()", "Bugünün tarihi."],
+    ["Başka sayfa", "='Sayfa 2'!B4", "Başka sayfadaki hücre."]
+];
+
+function showFunctionHelp() {
+    const lines = FUNCTION_HELP.map(([name, example, description]) => `${name}\n   ${example}  —  ${description}`);
+    showAppDialog({
+        title: "Formüller",
+        message: "Formül = ile başlar. Bağımsız değişkenler ; ya da , ile ayrılır. "
+            + "Türkçe ve İngilizce adlar birlikte geçer. Formül yazarken bir hücreye tıklamak başvurusunu ekler.\n\n"
+            + lines.join("\n")
+    });
+}
+
+function showShortcutHelp() {
+    showAppDialog({
+        title: "Klavye kısayolları",
+        message: [
+            "Ctrl+S  Kaydet   ·   Ctrl+Shift+S  Farklı kaydet",
+            "Ctrl+O  Aç   ·   Ctrl+P  Yazdır",
+            "Ctrl+Z  Geri al   ·   Ctrl+Y  Yinele",
+            "Ctrl+C / Ctrl+X / Ctrl+V  Kopyala / Kes / Yapıştır (Excel ile de)",
+            "Ctrl+B / Ctrl+I / Ctrl+U  Kalın / İtalik / Altı çizili",
+            "Ctrl+F  Ara ve değiştir   ·   Ctrl+A  Tümünü seç",
+            "F2  Hücreyi düzenle   ·   Delete  İçeriği sil",
+            "Enter / Tab  Aşağı / sağa geç (Shift ile geri)",
+            "Alt+Enter  Hücrede yeni satır",
+            "Ctrl+ok tuşları  Verinin kenarına atla",
+            "Shift+ok tuşları  Seçimi genişlet",
+            "Ctrl+Home / Ctrl+End  İlk / son dolu hücre"
+        ].join("\n")
+    });
+}
 
 insertMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -6567,16 +6640,23 @@ function placeCursorAtEnd(element) {
     selection.addRange(range);
 }
 
-function insertLineBreakAtCursor(element) {
+function insertTextAtCursor(text) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
     const range = selection.getRangeAt(0);
     range.deleteContents();
-    range.insertNode(document.createTextNode("\n"));
-    range.collapse(false);
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
+}
+
+function handleEditingCellInput() {
+    formulaPointState = null;
+    syncFormulaBarFromEditingCell();
 }
 
 function setFormulaInputValue(value) {
@@ -6587,9 +6667,7 @@ function setFormulaInputValue(value) {
 function getActiveEditingCell() {
     if (!isEditing || !selectedCell) return null;
 
-    return document.querySelector(
-        `td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`
-    );
+    return getCellElement(selectedCell.row, selectedCell.col);
 }
 
 function syncFormulaBarFromEditingCell() {
@@ -6606,32 +6684,113 @@ function syncEditingCellFromFormulaBar() {
     cell.textContent = formulaInput.value;
 }
 
+function isRowVisible(row) {
+    return !hiddenRows.has(row) && !isRowHiddenByFilter(row);
+}
+
+function isColVisible(col) {
+    return !hiddenCols.has(col);
+}
+
+function stepVisibleRow(row, delta) {
+    let next = row;
+    do {
+        next += delta;
+    } while (next >= 0 && next < rowCount && !isRowVisible(next));
+    return next < 0 || next >= rowCount ? row : next;
+}
+
+function stepVisibleCol(col, delta) {
+    let next = col;
+    do {
+        next += delta;
+    } while (next >= 0 && next < colCount && !isColVisible(next));
+    return next < 0 || next >= colCount ? col : next;
+}
+
+/** Birleştirilmiş hücrenin içindeki bir konum, birleştirmenin sol üst hücresine çevrilir. */
+function resolveMergedPosition(position) {
+    const target = tableData[position.row]?.[position.col]?.mergedTo;
+    return target ? { row: target.row, col: target.col } : position;
+}
+
 function getCellPositionAfterArrowKey(row, col, key) {
+    const visual = getVisualCellRange(row, col);
     switch (key) {
         case "ArrowUp":
-            return { row: Math.max(0, row - 1), col };
+            return resolveMergedPosition({ row: stepVisibleRow(visual.minRow, -1), col });
         case "ArrowDown":
-            return { row: Math.min(rowCount - 1, row + 1), col };
+            return resolveMergedPosition({ row: stepVisibleRow(visual.maxRow, 1), col });
         case "ArrowLeft":
-            return { row, col: Math.max(0, col - 1) };
+            return resolveMergedPosition({ row, col: stepVisibleCol(visual.minCol, -1) });
         case "ArrowRight":
-            return { row, col: Math.min(colCount - 1, col + 1) };
+            return resolveMergedPosition({ row, col: stepVisibleCol(visual.maxCol, 1) });
         default:
             return { row, col };
     }
+}
+
+function cellHasValue(row, col) {
+    const cell = tableData[row]?.[col];
+    return Boolean(cell && (cell.formula || String(cell.value ?? "") !== ""));
+}
+
+/** Ctrl+ok: dolu bölgenin kenarına ya da sonraki dolu hücreye atlar (Excel davranışı). */
+function getDataEdgePosition(row, col, key) {
+    const vertical = key === "ArrowUp" || key === "ArrowDown";
+    const delta = key === "ArrowUp" || key === "ArrowLeft" ? -1 : 1;
+    const step = (position) => (vertical
+        ? { row: stepVisibleRow(position.row, delta), col: position.col }
+        : { row: position.row, col: stepVisibleCol(position.col, delta) });
+    const same = (a, b) => a.row === b.row && a.col === b.col;
+
+    let current = { row, col };
+    let next = step(current);
+    if (same(current, next)) return current;
+
+    if (cellHasValue(current.row, current.col) && cellHasValue(next.row, next.col)) {
+        while (!same(current, next) && cellHasValue(next.row, next.col)) {
+            current = next;
+            next = step(current);
+        }
+        return current;
+    }
+
+    current = next;
+    while (!cellHasValue(current.row, current.col)) {
+        next = step(current);
+        if (same(current, next)) return current;
+        current = next;
+    }
+    return current;
+}
+
+function getLastUsedPosition() {
+    let maxRow = 0;
+    let maxCol = 0;
+    for (let r = 0; r < rowCount; r++) {
+        for (let c = 0; c < colCount; c++) {
+            if (cellHasValue(r, c)) {
+                maxRow = Math.max(maxRow, r);
+                maxCol = Math.max(maxCol, c);
+            }
+        }
+    }
+    return { row: maxRow, col: maxCol };
 }
 
 function handleEditingCellKeydown(e) {
     if (e.altKey && e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        insertLineBreakAtCursor(e.currentTarget);
+        insertTextAtCursor("\n");
         syncFormulaBarFromEditingCell();
         return;
     }
 
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-        if (!selectedCell) return;
+        // F2 ya da çift tıkla açılan düzenlemede oklar imleci metin içinde taşır.
+        if (editMode === "edit" || !selectedCell || e.shiftKey) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -6640,13 +6799,16 @@ function handleEditingCellKeydown(e) {
         const targetCell = getCellPositionAfterArrowKey(row, col, e.key);
 
         exitEditMode(true);
-        selectedCell = targetCell;
-        selectionRange = null;
-        selectionMode = "cell";
-        extraSelections = [];
-        renderTable();
-        focusSelectedCell();
+        selectCell(targetCell.row, targetCell.col, true);
     }
+}
+
+function handleEditingCellPaste(e) {
+    // Biçimli içerik hücreye HTML olarak girmesin; yalnız düz metin yapıştırılır.
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    insertTextAtCursor(text.replace(/\r\n?/g, "\n").replace(/\n$/, ""));
+    syncFormulaBarFromEditingCell();
 }
 
 /* FORMÜL FONKSİYONLARI */
@@ -6686,295 +6848,116 @@ function isRangeWithinBounds(start, end) {
     );
 }
 
-function getCellNumericValue(row, col) {
-    if (!isCellWithinBounds(row, col)) return 0;
-
-    const cell = tableData[row][col];
-
-    if (cell.formula) {
-        const formulaValue = evaluateFormula(cell.formula, row, col);
-        const num = parseFloat(formulaValue);
-        return isNaN(num) ? 0 : num;
-    }
-
-    const num = parseFloat(cell.value);
-    return isNaN(num) ? 0 : num;
+function getWorkbookAccessor() {
+    return {
+        sheetCount: Math.max(1, sheets.length),
+        getSheetName: (index) => sheets[index]?.name ?? (index === activeSheetIndex ? "Sayfa1" : ""),
+        getSize: (index) => (index === activeSheetIndex
+            ? { rows: rowCount, cols: colCount }
+            : { rows: sheets[index]?.rowCount ?? 0, cols: sheets[index]?.colCount ?? 0 }),
+        getCell: (index, row, col) => getSheetTableData(index)?.[row]?.[col] ?? null
+    };
 }
 
-function getCellReferenceValue(row, col, currentRow, currentCol) {
-    if (!isCellWithinBounds(row, col)) return 0;
-    if (row === currentRow && col === currentCol) return 0;
-
-    const cell = tableData[row][col];
-    return cell?.value ?? "";
-}
-
-function getRangeValues(range) {
-    const [startRef, endRef] = range.split(":");
-
-    const start = cellRefToIndex(startRef);
-    const end = cellRefToIndex(endRef);
-
-    if (!isRangeWithinBounds(start, end)) return [];
-
-    const minRow = Math.min(start.row, end.row);
-    const maxRow = Math.max(start.row, end.row);
-    const minCol = Math.min(start.col, end.col);
-    const maxCol = Math.max(start.col, end.col);
-
-    const values = [];
-
-    for (let r = minRow; r <= maxRow; r++) {
-        for (let c = minCol; c <= maxCol; c++) {
-            values.push(getCellNumericValue(r, c));
-        }
-    }
-
-    return values;
-}
-
-function getCellsInRange(range) {
-    const [start, end] = range.split(":");
-
-    const startIndex = cellRefToIndex(start);
-    const endIndex = cellRefToIndex(end);
-
-    if (!isRangeWithinBounds(startIndex, endIndex)) return [];
-
-    const minRow = Math.min(startIndex.row, endIndex.row);
-    const maxRow = Math.max(startIndex.row, endIndex.row);
-    const minCol = Math.min(startIndex.col, endIndex.col);
-    const maxCol = Math.max(startIndex.col, endIndex.col);
-
-    const cells = [];
-
-    for (let r = minRow; r <= maxRow; r++) {
-        for (let c = minCol; c <= maxCol; c++) {
-            cells.push({ row: r, col: c });
-        }
-    }
-
-    return cells;
-}
-
-function calculateSUM(range) {
-    const values = getRangeValues(range);
-    return values.reduce((sum, v) => sum + v, 0);
-}
-
-function calculateAVG(range) {
-    const values = getRangeValues(range);
-    if (values.length === 0) return 0;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
-
-function calculateCOUNT(range) {
-    const cells = getCellsInRange(range);
-    let count = 0;
-
-    cells.forEach(({ row, col }) => {
-        const cell = tableData[row]?.[col];
-        const value = cell?.formula ? getCellNumericValue(row, col) : parseFloat(cell?.value);
-
-        if (!isNaN(value)) {
-            count++;
-        }
-    });
-
-    return count;
-}
-
-function calculateMIN(range) {
-    const cells = getCellsInRange(range);
-    let min = null;
-
-    cells.forEach(({ row, col }) => {
-        const val = getCellNumericValue(row, col);
-        if (!isNaN(val)) {
-            min = min === null ? val : Math.min(min, val);
-        }
-    });
-
-    return min ?? 0;
-}
-
-function calculateMAX(range) {
-    const cells = getCellsInRange(range);
-    let max = null;
-
-    cells.forEach(({ row, col }) => {
-        const val = getCellNumericValue(row, col);
-        if (!isNaN(val)) {
-            max = max === null ? val : Math.max(max, val);
-        }
-    });
-
-    return max ?? 0;
-}
-
-function evaluateFormula(formula, currentRow, currentCol) {
-    let expr = formula.slice(1).trim(); // '=' çıkar
-    const singleReference = expr.match(/^\$?[A-Z]+\$?\d+$/i);
-
-    if (singleReference) {
-        const index = cellRefToIndex(singleReference[0].toUpperCase());
-        if (!index) return 0;
-
-        return getCellReferenceValue(index.row, index.col, currentRow, currentCol);
-    }
-
-    // SUM
-    expr = expr.replace(/SUM\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi, (_, range) => {
-        return calculateSUM(range.toUpperCase());
-    });
-    // AVERAGE / AVG
-    expr = expr.replace(/AVG\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi, (_, range) => {
-        return calculateAVG(range.toUpperCase());
-    });
-    expr = expr.replace(/AVERAGE\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi, (_, range) => {
-        return calculateAVG(range.toUpperCase());
-    });
-
-    // COUNT
-    expr = expr.replace(/COUNT\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi, (_, range) => {
-        return calculateCOUNT(range.toUpperCase());
-    });
-
-    // MIN
-    expr = expr.replace(
-        /MIN\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi,
-        (_, range) => calculateMIN(range.toUpperCase())
-    );
-
-    // MAX
-    expr = expr.replace(
-        /MAX\(\s*(\$?[A-Z]+\$?\d+:\$?[A-Z]+\$?\d+)\s*\)/gi,
-        (_, range) => calculateMAX(range.toUpperCase())
-    );
-
-    // TEKİL HÜCRELERİ ÇÖZ
-    expr = expr.replace(/(\$?[A-Z]+\$?[0-9]+)/gi, (match) => {
-        const index = cellRefToIndex(match.toUpperCase());
-        if (!index) return 0;
-
-        // kendine referans → 0 (ilk sürüm)
-        if (
-            index.row === currentRow &&
-            index.col === currentCol
-        ) return 0;
-
-        return getCellNumericValue(index.row, index.col);
-    });
-
-    try {
-        const result = Function(`"use strict"; return (${expr})`)();
-
-        if (!isFinite(result)) return 0;
-        return isNaN(result) ? 0 : result;
-    } catch {
-        return 0;
-    }
-}
-
+/** Bütün sayfalardaki formülleri yeniden hesaplar; döngüsel başvurular #DÖNGÜ! olur. */
 function recalculateAll() {
     const chartSignaturesBefore = captureChartDependencySignatures();
+    const evaluator = AwFormula.createEvaluator(getWorkbookAccessor());
 
-    for (let r = 0; r < rowCount; r++) {
-        for (let c = 0; c < colCount; c++) {
-            const cell = tableData[r][c];
-
-            if (cell.formula) {
-                cell.value = evaluateFormula(
-                    cell.formula,
-                    r,
-                    c
-                ).toString();
-            }
-        }
-    }
+    forEachWorkbookFormulaCell((cell, sheetIndex, row, col) => {
+        cell.value = AwFormula.valueToStorage(evaluator.getValue(sheetIndex, row, col));
+    });
 
     refreshChartsWithChangedCalculatedValues(chartSignaturesBefore);
 }
 
+/** Hücre metnini sayıya çevirir ("3,5" ve "3.5" geçer); sayı değilse null. */
+function parseCellNumber(value) {
+    return AwFormula.parseNumber(value);
+}
+
+function setCellInput(cell, text) {
+    const value = String(text ?? "");
+    if (value.startsWith("=") && value.length > 1) {
+        cell.formula = value;
+    } else {
+        cell.formula = null;
+        cell.value = value;
+    }
+}
+
+// renderTable sonrası hücre öğeleri bir kez dizinlenir; seçimde querySelector gerekmez.
+let cellElements = new Map();
+let decoratedCellElements = new Set();
+
+function indexCellElements() {
+    cellElements = new Map();
+    decoratedCellElements = new Set();
+    table.querySelectorAll("td[data-row]").forEach((td) => {
+        cellElements.set(`${td.dataset.row}:${td.dataset.col}`, td);
+        if (td.className) decoratedCellElements.add(td);
+    });
+}
+
+function getCellElement(row, col) {
+    const element = cellElements.get(`${row}:${col}`);
+    if (element?.isConnected) return element;
+    return table.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+}
+
 function enterEditMode(row, col, initialChar = null) {
     if (internalClipboard || copiedRange || clipboardMode) {
-        clearClipboardState(true);
+        clearClipboardState(true, false);
     }
 
-    const cell = document.querySelector(
-        `td[data-row="${row}"][data-col="${col}"]`
-    );
-    if (!cell) {
-        console.warn("HÜCRE BULUNAMADI");
-        return;
-    }
+    const cell = getCellElement(row, col);
+    if (!cell) return;
 
     isEditing = true;
-    editBackupValue = tableData[row][col].formula ?? tableData[row][col].value;
+    editMode = initialChar === null ? "edit" : "enter";
+    formulaPointState = null;
+    editBackupValue = getCellEditValue(row, col);
     updateToolbarState();
 
     cell.contentEditable = "true";
     cell.classList.add("editing");
     cell.addEventListener("keydown", handleEditingCellKeydown);
-    cell.focus();
-
-    if (initialChar !== null) {
-        cell.textContent = initialChar;
-    } else {
-        cell.textContent = editBackupValue;
-    }
+    cell.addEventListener("input", handleEditingCellInput);
+    cell.addEventListener("paste", handleEditingCellPaste);
+    cell.textContent = initialChar !== null ? initialChar : editBackupValue;
     formulaInput.value = cell.textContent;
-
-    cell.addEventListener("input", syncFormulaBarFromEditingCell);
+    cell.focus({ preventScroll: true });
     placeCursorAtEnd(cell);
 }
 
 function exitEditMode(save = true) {
     if (!isEditing || !selectedCell) return;
+
     const { row, col } = selectedCell;
-    const cell = document.querySelector(
-        `td[data-row="${row}"][data-col="${col}"]`
-    );
-    if (!cell) return;
-    if (save) {
-        const text = cell.textContent.trim();
+    const cell = getCellElement(row, col);
+    const text = cell ? cell.textContent.replace(/ /g, " ").trim() : editBackupValue;
+    const changed = save && text !== editBackupValue;
 
-        if (text !== editBackupValue) {
-            pushHistory();
-        }
-
-        if (text.startsWith("=")) {
-            tableData[row][col].formula = text;
-        } else {
-            tableData[row][col].formula = null;
-            tableData[row][col].value = text;
-        }
-
-    } else {
-        cell.textContent = editBackupValue;
-        formulaInput.value = editBackupValue;
+    if (cell) {
+        cell.removeEventListener("input", handleEditingCellInput);
+        cell.removeEventListener("keydown", handleEditingCellKeydown);
+        cell.removeEventListener("paste", handleEditingCellPaste);
+        cell.contentEditable = "false";
+        cell.classList.remove("editing");
     }
-    cell.removeEventListener("input", syncFormulaBarFromEditingCell);
-    cell.removeEventListener("keydown", handleEditingCellKeydown);
-    cell.contentEditable = "false";
-    cell.classList.remove("editing");
+
     isEditing = false;
     editBackupValue = "";
-    updateToolbarState();
+    formulaPointState = null;
 
-    if (tableData[row][col].formula) {
-        tableData[row][col].value =
-            evaluateFormula(
-                tableData[row][col].formula,
-                row,
-                col
-            ).toString();
+    if (changed) {
+        pushHistory();
+        setCellInput(tableData[row][col], text);
+        recalculateAll();
     }
 
-    recalculateAll();
     renderTable();
-    refreshChartsForChangedCell(row, col);
-
+    if (changed) refreshChartsForChangedCell(row, col);
 }
 
 function commitFormulaInput() {
@@ -6995,28 +6978,44 @@ function commitFormulaInput() {
     }
 
     pushHistory();
-
-    if (text.startsWith("=")) {
-        tableData[row][col].formula = text;
-    } else {
-        tableData[row][col].formula = null;
-        tableData[row][col].value = text;
-    }
-
-    if (tableData[row][col].formula) {
-        tableData[row][col].value = evaluateFormula(
-            tableData[row][col].formula,
-            row,
-            col
-        ).toString();
-    }
-
+    setCellInput(tableData[row][col], text);
     recalculateAll();
-    copiedRange = null;
-    internalClipboard = null;
-    clipboardMode = null;
+    clearClipboardState();
     renderTable();
     refreshChartsForChangedCell(row, col);
+}
+
+/** Formül yazılırken bir hücreye tıklanırsa başvurusu formüle eklenir (sürüklenirse aralık). */
+function canInsertFormulaReference() {
+    if (!isEditing) return false;
+    const text = getActiveEditingCell()?.textContent ?? "";
+    if (!text.startsWith("=")) return false;
+    if (formulaPointState) return true;
+    return /[=(,;+\-*/^&<>:]\s*$/.test(text);
+}
+
+function updateFormulaPointReference(row, col) {
+    const cell = getActiveEditingCell();
+    if (!cell || !formulaPointState) return;
+
+    const { anchor, prefix } = formulaPointState;
+    const start = getCellName(Math.min(anchor.row, row), Math.min(anchor.col, col));
+    const end = getCellName(Math.max(anchor.row, row), Math.max(anchor.col, col));
+    cell.textContent = `${prefix}${start === end ? start : `${start}:${end}`}`;
+    placeCursorAtEnd(cell);
+    syncFormulaBarFromEditingCell();
+}
+
+function startFormulaPointReference(row, col) {
+    const cell = getActiveEditingCell();
+    if (!cell) return;
+
+    const text = cell.textContent;
+    const prefix = formulaPointState && !formulaPointState.dragging
+        ? text.slice(0, formulaPointState.prefix.length)
+        : text;
+    formulaPointState = { anchor: { row, col }, prefix, dragging: true };
+    updateFormulaPointReference(row, col);
 }
 
 function commitCellNameInput() {
@@ -7113,7 +7112,9 @@ window.addEventListener("pointerdown", (e) => {
         dataMenu?.contains(e.target) ||
         dataMenuBtn?.contains(e.target) ||
         formatMenu?.contains(e.target) ||
-        formatMenuBtn?.contains(e.target);
+        formatMenuBtn?.contains(e.target) ||
+        helpMenu?.contains(e.target) ||
+        helpMenuBtn?.contains(e.target);
 
     if (!isTextMenuTarget) {
         hideFileMenu();
@@ -7122,6 +7123,7 @@ window.addEventListener("pointerdown", (e) => {
         hideInsertMenu();
         hideDataMenu();
         hideFormatMenu();
+        hideHelpMenu();
     }
 }, true);
 
@@ -7175,6 +7177,9 @@ window.addEventListener("click", (e) => {
     }
     if (formatMenu && !formatMenu.contains(e.target) && !formatMenuBtn?.contains(e.target)) {
         hideFormatMenu();
+    }
+    if (helpMenu && !helpMenu.contains(e.target) && !helpMenuBtn?.contains(e.target)) {
+        hideHelpMenu();
     }
     if (
         filterPopup &&
@@ -7307,10 +7312,81 @@ window.addEventListener("mouseup", () => {
     resizeState = null;
 });
 
+/* ---------- Klavye ---------- */
+
+function isTextEntryTarget(element) {
+    if (!element) return false;
+    return (
+        element.tagName === "INPUT" ||
+        element.tagName === "TEXTAREA" ||
+        element.tagName === "SELECT" ||
+        (element.isContentEditable && !element.closest("#data-table"))
+    );
+}
+
+function moveSelectionTo(position, extend = false) {
+    const target = resolveMergedPosition(position);
+    if (extend && selectedCell) {
+        extraSelections = [];
+        selectionRange = {
+            start: selectionRange ? { ...selectionRange.start } : { ...selectedCell },
+            end: { ...target }
+        };
+        selectionMode = "range";
+    } else {
+        selectSingleCell(target.row, target.col);
+    }
+    renderSelection();
+    if (extend) {
+        getCellElement(target.row, target.col)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        focusSelectedCell();
+    } else {
+        focusSelectedCell(true);
+    }
+}
+
+function commitEditAndMove(dRow, dCol) {
+    if (!selectedCell) return;
+    const { row, col } = selectedCell;
+    exitEditMode(true);
+    let target = { row, col };
+    if (dRow) target = getCellPositionAfterArrowKey(row, col, dRow > 0 ? "ArrowDown" : "ArrowUp");
+    if (dCol) target = getCellPositionAfterArrowKey(row, col, dCol > 0 ? "ArrowRight" : "ArrowLeft");
+    selectCell(target.row, target.col, true);
+}
+
+function getPageRowStep() {
+    const visibleHeight = tableArea?.clientHeight ?? 600;
+    return Math.max(1, Math.floor(visibleHeight / (DEFAULT_ROW_HEIGHT * getZoomScale())) - 2);
+}
+
 window.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && !e.shiftKey && e.code === "KeyF") {
+    if (appDialog?.open) return;
+
+    const mod = e.ctrlKey || e.metaKey;
+    const isAltGraph = e.ctrlKey && e.altKey;
+
+    if (mod && !e.altKey && !e.shiftKey && e.code === "KeyF") {
         e.preventDefault();
         openFindPanel();
+        return;
+    }
+    if (mod && !e.altKey && e.code === "KeyS") {
+        e.preventDefault();
+        if (isEditing) exitEditMode(true);
+        if (e.shiftKey) saveWorkbookAs();
+        else saveWorkbook();
+        return;
+    }
+    if (mod && !e.altKey && !e.shiftKey && e.code === "KeyO") {
+        e.preventDefault();
+        runOpenWorkbook();
+        return;
+    }
+    if (mod && !e.altKey && !e.shiftKey && e.code === "KeyP") {
+        e.preventDefault();
+        if (isEditing) exitEditMode(true);
+        printActiveSheet();
         return;
     }
 
@@ -7326,181 +7402,640 @@ window.addEventListener("keydown", (e) => {
         hideEditMenu();
         hideViewMenu();
         hideInsertMenu();
+        hideDataMenu();
         hideFormatMenu();
+        hideHelpMenu();
         if (!isEditing && clearClipboardState(true)) {
             e.preventDefault();
             return;
         }
     }
 
-    // Eğer focus bir input veya textarea'daysa tablo klavyesi çalışmasın
-    if (
-        document.activeElement &&
-        (
-            document.activeElement.tagName === "INPUT" ||
-            document.activeElement.tagName === "TEXTAREA"
-        )
-    ) {
-        return;
-    }
-    if (e.ctrlKey && !e.shiftKey && e.code === "KeyZ") {
-        e.preventDefault();
-        undo();
-        return;
-    }
-    if (
-        (e.ctrlKey && e.code === "KeyY") ||
-        (e.ctrlKey && e.shiftKey && e.code === "KeyZ")
-    ) {
-        e.preventDefault();
-        redo();
-        return;
-    }
-    if (e.ctrlKey && e.code === "KeyX") {
-        if (isEditing || !selectedCell) return;
-
-        cutSelection();
-        e.preventDefault();
-        return;
-    }
-
-    if (e.ctrlKey && e.code === "KeyC") {
-        if (isEditing || !selectedCell) return;
-
-        copySelection();
-        e.preventDefault();
-        return;
-    }
-
-    if (e.ctrlKey && e.code === "KeyV") {
-        if (isEditing || !internalClipboard || !selectedCell) return;
-
-        pasteClipboard();
-        e.preventDefault();
-        return;
-    }
-
+    if (isTextEntryTarget(document.activeElement)) return;
     if (!selectedCell) return;
     const { row, col } = selectedCell;
-    // EDIT MODE
+
+    // DÜZENLEME
     if (isEditing) {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && !e.altKey) {
             e.preventDefault();
-            exitEditMode(true);
-            selectedCell = {
-                row: Math.min(row + 1, rowCount - 1),
-                col
-            };
-            selectionRange = null;
-            selectionMode = "cell";
-            renderTable();
-            focusSelectedCell();
+            commitEditAndMove(e.shiftKey ? -1 : 1, 0);
+            return;
+        }
+        if (e.key === "Tab") {
+            e.preventDefault();
+            commitEditAndMove(0, e.shiftKey ? -1 : 1);
             return;
         }
         if (e.key === "Escape") {
             e.preventDefault();
             exitEditMode(false);
-            return;
+            focusSelectedCell();
         }
         return;
     }
 
-    // SELECTION MODE → Delete / Backspace ile hücreyi temizle
-    if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        !isEditing
-    ) {
-        e.preventDefault();
-
-        pushHistory();
-        tableData[row][col] = {
-            value: "",
-            formula: null
-        };
-        recalculateAll();
-        clearClipboardState();
-        renderTable();
-        focusSelectedCell();
+    if (mod && !isAltGraph) {
+        switch (e.code) {
+            case "KeyZ":
+                e.preventDefault();
+                if (e.shiftKey) redo();
+                else undo();
+                return;
+            case "KeyY":
+                e.preventDefault();
+                redo();
+                return;
+            case "KeyA":
+                e.preventDefault();
+                selectAllCells();
+                return;
+            case "KeyB":
+                e.preventDefault();
+                toggleStyleProperty("bold");
+                return;
+            case "KeyI":
+                e.preventDefault();
+                toggleStyleProperty("italic");
+                return;
+            case "KeyU":
+                e.preventDefault();
+                toggleStyleProperty("underline");
+                return;
+            case "KeyC":
+            case "KeyX":
+                // Asıl iş "copy"/"cut" olayında; olay gelmezse (eski tarayıcı) yedek yol çalışır.
+                startKeyboardCopy(e.code === "KeyX" ? "cut" : "copy");
+                return;
+            case "Home":
+                e.preventDefault();
+                moveSelectionTo({ row: stepVisibleRow(-1, 1), col: stepVisibleCol(-1, 1) }, e.shiftKey);
+                return;
+            case "End":
+                e.preventDefault();
+                moveSelectionTo(getLastUsedPosition(), e.shiftKey);
+                return;
+            default:
+                break;
+        }
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+            e.preventDefault();
+            const base = e.shiftKey && selectionRange ? selectionRange.end : selectedCell;
+            moveSelectionTo(getDataEdgePosition(base.row, base.col, e.key), e.shiftKey);
+        }
         return;
     }
 
-    // SELECTION MODE → yazı ile edit'e gir
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+    if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        clearSelectionContents();
+        return;
+    }
+
+    if (e.key === "F2") {
+        e.preventDefault();
+        clearClipboardState();
+        enterEditMode(row, col);
+        return;
+    }
+
+    if (e.key === "Enter") {
+        e.preventDefault();
+        moveSelectionTo(getCellPositionAfterArrowKey(row, col, e.shiftKey ? "ArrowUp" : "ArrowDown"));
+        return;
+    }
+
+    if (e.key === "Tab") {
+        e.preventDefault();
+        moveSelectionTo(getCellPositionAfterArrowKey(row, col, e.shiftKey ? "ArrowLeft" : "ArrowRight"));
+        return;
+    }
+
+    if (e.key === "Home") {
+        e.preventDefault();
+        moveSelectionTo({ row: e.shiftKey && selectionRange ? selectionRange.end.row : row, col: stepVisibleCol(-1, 1) }, e.shiftKey);
+        return;
+    }
+
+    if (e.key === "PageDown" || e.key === "PageUp") {
+        e.preventDefault();
+        const base = e.shiftKey && selectionRange ? selectionRange.end : selectedCell;
+        let target = base.row;
+        for (let i = 0; i < getPageRowStep(); i++) target = stepVisibleRow(target, e.key === "PageDown" ? 1 : -1);
+        moveSelectionTo({ row: target, col: base.col }, e.shiftKey);
+        return;
+    }
+
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        const base = e.shiftKey && selectionRange ? selectionRange.end : selectedCell;
+        moveSelectionTo(getCellPositionAfterArrowKey(base.row, base.col, e.key), e.shiftKey);
+        return;
+    }
+
+    // Yazmaya başlamak hücreyi düzenlemeye açar (AltGr ile yazılan @, € gibi karakterler dahil).
+    if (e.key.length === 1 && (!e.altKey || isAltGraph) && (!mod || isAltGraph)) {
         e.preventDefault();
         clearClipboardState();
         enterEditMode(row, col, e.key);
-        return;
-    }
-    const navigationBase = e.shiftKey && selectionRange
-        ? selectionRange.end
-        : selectedCell;
-    const baseRow = navigationBase.row;
-    const baseCol = navigationBase.col;
-    let newRow = baseRow;
-    let newCol = baseCol;
-    const navigationKeys = [
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowLeft",
-        "ArrowRight"
-    ];
-
-    // SADECE ok tuşlarına izin ver
-    if (!navigationKeys.includes(e.key)) {
-        e.preventDefault();
-        return;
-    }
-    switch (e.key) {
-        case "ArrowUp":
-            newRow = Math.max(0, baseRow - 1);
-            break;
-        case "ArrowDown":
-            newRow = Math.min(rowCount - 1, baseRow + 1);
-            break;
-        case "ArrowLeft":
-            newCol = Math.max(0, baseCol - 1);
-            break;
-        case "ArrowRight":
-            newCol = Math.min(colCount - 1, baseCol + 1);
-            break;
-    }
-    e.preventDefault();
-
-    if (newRow !== baseRow || newCol !== baseCol) {
-        if (e.shiftKey) {
-            extraSelections = [];
-            if (!selectionRange) {
-                selectionRange = {
-                    start: { ...selectedCell },
-                    end: { row: newRow, col: newCol }
-                };
-            } else {
-                selectionRange.end = { row: newRow, col: newCol };
-            }
-            selectionMode = "range";
-        } else {
-            selectedCell = { row: newRow, col: newCol };
-            selectionRange = null;
-            selectionMode = "cell";
-            extraSelections = [];
-        }
-        renderTable();
-        focusSelectedCell();
     }
 });
+
+/* ---------- Pano (sistem panosuyla da çalışır) ---------- */
+
+let lastClipboardText = null;
+let pendingKeyboardCopy = null;
+
+function normalizeClipboardText(text) {
+    return String(text ?? "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+}
+
+function getActiveRangeClipboardData() {
+    const range = getActiveRange();
+    if (!range) return { text: "", html: "" };
+
+    const textRows = [];
+    const htmlRows = [];
+    for (let r = range.minRow; r <= range.maxRow; r++) {
+        if (!isRowVisible(r) && selectionMode !== "cell") continue;
+        const textCells = [];
+        const htmlCells = [];
+        for (let c = range.minCol; c <= range.maxCol; c++) {
+            const cell = tableData[r]?.[c];
+            const display = cell?.mergedTo ? "" : formatCellDisplayValue(cell);
+            textCells.push(/[\t\n"]/.test(display) ? `"${display.replace(/"/g, '""')}"` : display);
+            const style = getCellStyle(cell);
+            const css = [
+                style.bold ? "font-weight:bold" : "",
+                style.italic ? "font-style:italic" : "",
+                style.backgroundColor ? `background:${style.backgroundColor}` : "",
+                style.color && style.color !== "#202124" ? `color:${style.color}` : ""
+            ].filter(Boolean).join(";");
+            htmlCells.push(`<td${css ? ` style="${css}"` : ""}>${escapeHtml(display).replace(/\n/g, "<br>")}</td>`);
+        }
+        textRows.push(textCells.join("\t"));
+        htmlRows.push(`<tr>${htmlCells.join("")}</tr>`);
+    }
+
+    return {
+        text: textRows.join("\n"),
+        html: `<table>${htmlRows.join("")}</table>`
+    };
+}
+
+function copySelectionToClipboard(mode) {
+    const data = getActiveRangeClipboardData();
+    setClipboardFromSelection(mode);
+    lastClipboardText = normalizeClipboardText(data.text);
+    return data;
+}
+
+function writeSystemClipboard(text) {
+    navigator.clipboard?.writeText?.(text).catch(() => {});
+}
+
+function startKeyboardCopy(mode) {
+    pendingKeyboardCopy = mode;
+    setTimeout(() => {
+        // "copy" olayı gelmediyse panoya yine de yazılır.
+        if (pendingKeyboardCopy === mode) {
+            pendingKeyboardCopy = null;
+            const data = copySelectionToClipboard(mode);
+            writeSystemClipboard(data.text);
+        }
+    }, 0);
+}
+
+function shouldHandleGridClipboard() {
+    return Boolean(selectedCell) && !isEditing && !appDialog?.open && !isTextEntryTarget(document.activeElement);
+}
+
+function handleClipboardCopy(e, mode) {
+    if (!shouldHandleGridClipboard()) return;
+    e.preventDefault();
+    pendingKeyboardCopy = null;
+    const data = copySelectionToClipboard(mode);
+    e.clipboardData?.setData("text/plain", data.text);
+    e.clipboardData?.setData("text/html", data.html);
+}
+
+document.addEventListener("copy", (e) => handleClipboardCopy(e, "copy"));
+document.addEventListener("cut", (e) => handleClipboardCopy(e, "cut"));
+document.addEventListener("paste", (e) => {
+    if (!shouldHandleGridClipboard()) return;
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    pasteFromText(text);
+});
+
+function pasteFromText(text) {
+    if (internalClipboard && (lastClipboardText === null || normalizeClipboardText(text) === lastClipboardText || text === "")) {
+        return pasteClipboard();
+    }
+    if (text === "") return false;
+    return pasteExternalText(text);
+}
+
+/** Excel, LibreOffice ya da bir web sayfasından kopyalanan sekmeli metni yapıştırır (biçim korunur). */
+function pasteExternalText(text) {
+    if (!selectedCell) return false;
+    const rows = AwFileIO.parseDelimited(normalizeClipboardText(text), "\t");
+    if (!rows.length) return false;
+
+    const activeRange = getActiveRange();
+    const isSingleValue = rows.length === 1 && rows[0].length === 1;
+    const startRow = activeRange?.minRow ?? selectedCell.row;
+    const startCol = activeRange?.minCol ?? selectedCell.col;
+    const height = isSingleValue && activeRange ? activeRange.maxRow - activeRange.minRow + 1 : rows.length;
+    const width = isSingleValue && activeRange
+        ? activeRange.maxCol - activeRange.minCol + 1
+        : Math.max(...rows.map((row) => row.length));
+
+    pushHistory();
+    ensureGridSize(startRow + height, startCol + width);
+    const targetRange = { minRow: startRow, maxRow: startRow + height - 1, minCol: startCol, maxCol: startCol + width - 1 };
+    if (!isSingleValue) clearMergesIntersectingRange(targetRange);
+
+    for (let r = 0; r < height; r++) {
+        for (let c = 0; c < width; c++) {
+            const cell = tableData[startRow + r][startCol + c];
+            if (cell.mergedTo) continue;
+            const value = isSingleValue ? rows[0][0] : rows[r]?.[c] ?? "";
+            setCellInput(cell, value);
+        }
+    }
+
+    clearClipboardState();
+    selectedCell = { row: startRow, col: startCol };
+    if (height > 1 || width > 1) {
+        selectionRange = { start: { row: startRow, col: startCol }, end: { row: targetRange.maxRow, col: targetRange.maxCol } };
+        selectionMode = "range";
+    }
+    recalculateAll();
+    renderTable();
+    refreshChartsForChangedRange(targetRange);
+    focusSelectedCell();
+    return true;
+}
+
+async function pasteFromMenu() {
+    if (internalClipboard) {
+        let systemText = null;
+        try {
+            systemText = await navigator.clipboard?.readText?.();
+        } catch {
+            systemText = null;
+        }
+        if (systemText === null || systemText === undefined || normalizeClipboardText(systemText) === lastClipboardText) {
+            return pasteClipboard();
+        }
+        return pasteExternalText(systemText);
+    }
+
+    try {
+        const text = await navigator.clipboard.readText();
+        return pasteFromText(text);
+    } catch {
+        showAppMessage("Tarayıcı panoyu okumaya izin vermedi. Yapıştırmak için Ctrl+V kullanın.");
+        return false;
+    }
+}
+
+function copyFromMenu(mode) {
+    const data = copySelectionToClipboard(mode);
+    writeSystemClipboard(data.text);
+}
+
+/* ---------- İletişim kutuları (alert/confirm/prompt yerine) ---------- */
+
+const appDialog = document.getElementById("app-dialog");
+
+function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, danger = false } = {}) {
+    return new Promise((resolve) => {
+        if (!appDialog) {
+            resolve({ confirmed: true, value: input?.value ?? "" });
+            return;
+        }
+
+        const titleElement = appDialog.querySelector(".app-dialog-title");
+        const messageElement = appDialog.querySelector(".app-dialog-message");
+        const fieldsElement = appDialog.querySelector(".app-dialog-fields");
+        const confirmButton = appDialog.querySelector(".app-dialog-confirm");
+        const cancelButton = appDialog.querySelector(".app-dialog-cancel");
+
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+        messageElement.hidden = !message;
+        fieldsElement.replaceChildren();
+        confirmButton.textContent = confirmText;
+        confirmButton.classList.toggle("danger", danger);
+        cancelButton.textContent = cancelText ?? "";
+        cancelButton.hidden = !cancelText;
+
+        let inputElement = null;
+        let selectElement = null;
+        if (input) {
+            inputElement = document.createElement(input.multiline ? "textarea" : "input");
+            inputElement.className = "app-dialog-input";
+            inputElement.value = input.value ?? "";
+            inputElement.placeholder = input.placeholder ?? "";
+            inputElement.spellcheck = false;
+            if (input.multiline) inputElement.rows = 5;
+            fieldsElement.appendChild(inputElement);
+        }
+        if (select) {
+            selectElement = document.createElement("select");
+            selectElement.className = "app-dialog-select";
+            select.options.forEach((option) => {
+                const element = document.createElement("option");
+                element.value = option.value;
+                element.textContent = option.label;
+                selectElement.appendChild(element);
+            });
+            selectElement.value = select.value ?? select.options[0]?.value;
+            fieldsElement.appendChild(selectElement);
+        }
+
+        const finish = (confirmed) => {
+            appDialog.removeEventListener("close", onClose);
+            confirmButton.removeEventListener("click", onConfirm);
+            cancelButton.removeEventListener("click", onCancel);
+            appDialog.removeEventListener("keydown", onKeydown);
+            if (appDialog.open) appDialog.close();
+            resolve({
+                confirmed,
+                value: inputElement?.value ?? "",
+                selected: selectElement?.value ?? null
+            });
+            focusSelectedCell();
+        };
+        const onConfirm = () => finish(true);
+        const onCancel = () => finish(false);
+        const onClose = () => finish(false);
+        const onKeydown = (event) => {
+            event.stopPropagation();
+            if (event.key === "Enter" && !(event.target.tagName === "TEXTAREA" && !event.ctrlKey)) {
+                event.preventDefault();
+                finish(true);
+            }
+        };
+
+        confirmButton.addEventListener("click", onConfirm);
+        cancelButton.addEventListener("click", onCancel);
+        appDialog.addEventListener("close", onClose);
+        appDialog.addEventListener("keydown", onKeydown);
+        appDialog.showModal();
+        (inputElement ?? selectElement ?? confirmButton).focus();
+        inputElement?.select?.();
+    });
+}
+
+function showAppMessage(message, title = "awCELL") {
+    return showAppDialog({ title, message });
+}
+
+async function showAppConfirm(message, options = {}) {
+    const result = await showAppDialog({
+        title: options.title ?? "awCELL",
+        message,
+        confirmText: options.confirmText ?? "Evet",
+        cancelText: options.cancelText ?? "Vazgeç",
+        danger: options.danger ?? false
+    });
+    return result.confirmed;
+}
+
+/* ---------- Notlar ---------- */
+
+async function editNoteForSelection() {
+    if (!selectedCell) return false;
+    const { row, col } = selectedCell;
+    const cell = tableData[row]?.[col];
+    if (!cell) return false;
+
+    const result = await showAppDialog({
+        title: `${getCellName(row, col)} notu`,
+        input: { value: cell.note ?? "", multiline: true, placeholder: "Not yazın" },
+        confirmText: "Kaydet",
+        cancelText: "Vazgeç"
+    });
+    if (!result.confirmed) return false;
+
+    const note = result.value.trim();
+    if (note === (cell.note ?? "")) return false;
+    pushHistory();
+    if (note) cell.note = note;
+    else delete cell.note;
+    renderTable();
+    focusSelectedCell();
+    return true;
+}
+
+function deleteNoteForSelection() {
+    const ranges = getActiveRanges();
+    let changed = false;
+    ranges.forEach((range) => {
+        for (let r = range.minRow; r <= range.maxRow; r++) {
+            for (let c = range.minCol; c <= range.maxCol; c++) {
+                if (tableData[r]?.[c]?.note) changed = true;
+            }
+        }
+    });
+    if (!changed) return false;
+
+    pushHistory();
+    ranges.forEach((range) => {
+        for (let r = range.minRow; r <= range.maxRow; r++) {
+            for (let c = range.minCol; c <= range.maxCol; c++) {
+                if (tableData[r]?.[c]) delete tableData[r][c].note;
+            }
+        }
+    });
+    renderTable();
+    focusSelectedCell();
+    return true;
+}
+
+/* ---------- Yazdırma ve PDF ---------- */
+
+function getPrintableSheets(onlyActive) {
+    captureCurrentSheet();
+    const list = onlyActive ? [sheets[activeSheetIndex]] : sheets;
+    return list.filter(Boolean);
+}
+
+function renderPrintPages(sheetList) {
+    return sheetList.flatMap((sheet) => AwFileIO.renderSheetPages(sheet, {
+        formatCell: formatCellDisplayValue,
+        scale: 2
+    }));
+}
+
+async function printActiveSheet() {
+    const pages = renderPrintPages(getPrintableSheets(true));
+    if (!pages.length) {
+        showAppMessage("Bu sayfada yazdırılacak bir şey yok.");
+        return false;
+    }
+
+    const isLandscape = pages[0].widthPt > pages[0].heightPt;
+    const frame = document.createElement("iframe");
+    frame.className = "print-frame";
+    frame.setAttribute("aria-hidden", "true");
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(sheets[activeSheetIndex]?.name ?? "awCELL")}</title>`
+        + `<style>@page{size:A4 ${isLandscape ? "landscape" : "portrait"};margin:0}html,body{margin:0;padding:0}`
+        + `img{display:block;width:100%;height:auto;page-break-after:always;break-after:page}img:last-child{page-break-after:auto;break-after:auto}</style></head><body>`
+        + pages.map((page) => `<img src="${page.canvas.toDataURL("image/png")}" alt="">`).join("")
+        + "</body></html>");
+    doc.close();
+
+    await Promise.all([...doc.images].map((image) => (image.complete ? null : new Promise((resolve) => {
+        image.onload = resolve;
+        image.onerror = resolve;
+    }))));
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+    setTimeout(() => frame.remove(), 60_000);
+    return true;
+}
+
+function canvasToJpegBytes(canvas) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                reject(new Error("Sayfa görüntüsü oluşturulamadı."));
+                return;
+            }
+            resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, "image/jpeg", 0.92);
+    });
+}
+
+async function createPdfBlob() {
+    const pages = renderPrintPages(getPrintableSheets(false));
+    if (!pages.length) {
+        const blank = AwFileIO.renderSheetPages({
+            name: "",
+            rowCount: 1,
+            colCount: 1,
+            tableData: [[{ value: " ", style: {} }]],
+            colWidths: [84],
+            rowHeights: [26]
+        }, { formatCell: () => "", scale: 1 });
+        pages.push(...blank);
+    }
+    const pdfPages = [];
+    for (const page of pages) {
+        pdfPages.push({
+            jpeg: await canvasToJpegBytes(page.canvas),
+            pixelWidth: page.canvas.width,
+            pixelHeight: page.canvas.height,
+            widthPt: page.widthPt,
+            heightPt: page.heightPt
+        });
+    }
+    return new Blob([AwFileIO.buildPdf(pdfPages, getCurrentSaveBaseName())], { type: "application/pdf" });
+}
+
+/* ---------- Önceki oturumu geri yükleme ---------- */
+
+const PREVIOUS_SESSION_KEY = "awcell.previousSession";
+
+function safeStorageGet(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function safeStorageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function safeStorageRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Depolama kapalı.
+    }
+}
+
+/** Sekme kapanıp yeniden açılınca son çalışma kendiliğinden yüklenmez; geri yükleme önerilir. */
+function offerPreviousSessionRestore() {
+    const stored = safeStorageGet(PREVIOUS_SESSION_KEY);
+    const bar = document.getElementById("restore-bar");
+    if (!stored || !bar) return;
+
+    if (!storedWorkbookHasContent(stored)) {
+        safeStorageRemove(PREVIOUS_SESSION_KEY);
+        return;
+    }
+    const payload = JSON.parse(stored);
+
+    const savedAt = payload.savedAt ? new Date(payload.savedAt) : null;
+    const when = savedAt && !Number.isNaN(savedAt.getTime())
+        ? savedAt.toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "";
+    bar.querySelector(".restore-bar-text").textContent =
+        `Son çalışmanız bulundu${when ? ` (${when})` : ""}. Geri yüklemek ister misiniz?`;
+    bar.hidden = false;
+
+    const close = () => {
+        bar.hidden = true;
+        safeStorageRemove(PREVIOUS_SESSION_KEY);
+    };
+    bar.querySelector(".restore-bar-restore").onclick = () => {
+        close();
+        try {
+            isLoadingWorkbook = true;
+            loadWorkbookPayload(payload);
+        } finally {
+            isLoadingWorkbook = false;
+        }
+        scheduleAutoSave();
+    };
+    bar.querySelector(".restore-bar-dismiss").onclick = close;
+}
+
+function storedWorkbookHasContent(text) {
+    try {
+        const payload = JSON.parse(text);
+        return payload?.app === "awCELL" && Array.isArray(payload.sheets) &&
+            payload.sheets.some((sheet, index) => !isSheetEmpty(normalizeImportedSheet(sheet, index)));
+    } catch {
+        return false;
+    }
+}
+
 // INIT
 applyViewSettings();
-if (!isPageReload()) {
-    localStorage.removeItem(AUTOSAVE_KEY);
+const isReload = isPageReload();
+if (!isReload) {
+    // Yeni açılışta son çalışma ayrı bir anahtara alınır; boş bir oturum eski yedeği ezmez.
+    const stored = safeStorageGet(AUTOSAVE_KEY);
+    if (stored && storedWorkbookHasContent(stored)) safeStorageSet(PREVIOUS_SESSION_KEY, stored);
+    safeStorageRemove(AUTOSAVE_KEY);
 }
-if (!(isPageReload() && loadAutoSavedWorkbook())) {
+if (!(isReload && loadAutoSavedWorkbook())) {
     initData();
     sheets = [createSheetState("Sayfa1")];
+    recalculateAll();
     renderSheetTabs();
     renderTable();
 }
 isAppInitialized = true;
 scheduleAutoSave();
+focusSelectedCell();
+if (!isReload) offerPreviousSessionRestore();
 
 function isCellInRange(row, col, range) {
     if (!range) return false;
@@ -7576,14 +8111,20 @@ function getChartRangeValues(range, numeric = false) {
                 continue;
             }
 
-            const text = String(value ?? "").trim();
-            const number = text === "" ? 0 : Number(text);
+            const number = chartNumber(value);
             if (Number.isNaN(number)) return null;
             values.push(number);
         }
     }
 
     return values;
+}
+
+/** Grafik için hücre değeri: boş → 0, "3,5" → 3.5, sayı değilse NaN. */
+function chartNumber(value) {
+    const text = String(value ?? "").trim();
+    if (text === "") return 0;
+    return parseCellNumber(text) ?? NaN;
 }
 
 function createDefaultChartLabels(count) {
@@ -7618,7 +8159,7 @@ function getHorizontalNumericChartValues(row, minCol, maxCol) {
 
     for (let c = minCol; c <= maxCol; c++) {
         const valueText = String(tableData[row]?.[c]?.value ?? "").trim();
-        const value = valueText === "" ? 0 : Number(valueText);
+        const value = chartNumber(valueText);
         if (Number.isNaN(value)) return null;
         if (valueText !== "") hasNumericValue = true;
         values.push(value);
@@ -7663,10 +8204,10 @@ function getSingleRowLabelValueChartSelection(range) {
     if (!range || range.minRow !== range.maxRow || range.maxCol - range.minCol !== 1) return null;
 
     const labelText = String(tableData[range.minRow]?.[range.minCol]?.value ?? "").trim();
-    if (labelText === "" || !Number.isNaN(Number(labelText))) return null;
+    if (labelText === "" || parseCellNumber(labelText) !== null) return null;
 
     const valueText = String(tableData[range.minRow]?.[range.maxCol]?.value ?? "").trim();
-    const value = valueText === "" ? 0 : Number(valueText);
+    const value = chartNumber(valueText);
     if (Number.isNaN(value)) return null;
 
     return {
@@ -7704,8 +8245,7 @@ function getChartDataFromSelection() {
 
     if (isSingleRow) {
         for (let c = minCol; c <= maxCol; c++) {
-            const valueText = String(tableData[minRow]?.[c]?.value ?? "").trim();
-            const value = valueText === "" ? 0 : Number(valueText);
+            const value = chartNumber(tableData[minRow]?.[c]?.value);
             if (Number.isNaN(value)) return null;
 
             labels.push("");
@@ -7713,8 +8253,7 @@ function getChartDataFromSelection() {
         }
     } else {
         for (let r = minRow; r <= maxRow; r++) {
-            const valueText = String(tableData[r]?.[valueCol]?.value ?? "").trim();
-            const value = valueText === "" ? 0 : Number(valueText);
+            const value = chartNumber(tableData[r]?.[valueCol]?.value);
             if (Number.isNaN(value)) return null;
 
             labels.push(hasLabelColumn ? tableData[r]?.[minCol]?.value : "");
@@ -8182,7 +8721,7 @@ function drawChart(chart, labels, values, type) {
     const hasCartesianScale = !["pie", "doughnut", "radar"].includes(chartType);
     const showGridlines = chart.config?.showGridlines ?? chart.settings?.showGridlines ?? true;
     const showTrendline = chart.config?.showTrendline ?? chart.settings?.showTrendline ?? true;
-    const numericLabels = labels.map((label) => Number(label));
+    const numericLabels = labels.map((label) => parseCellNumber(label) ?? NaN);
     const hasNumericScatterLabels = type === "scatter" && numericLabels.every((value) => Number.isFinite(value));
     const scatterXValues = values.map((_, index) => hasNumericScatterLabels ? numericLabels[index] : index + 1);
     const scatterData = values.map((value, index) => ({
@@ -8333,8 +8872,7 @@ function drawChart(chart, labels, values, type) {
             },
             scales: chartType === "radar" ? {
                 r: {
-                    min: minValue - 1,
-                    max: maxValue + 1,
+                    beginAtZero: minValue >= 0,
                     grid: {
                         display: showGridlines
                     },
@@ -8347,8 +8885,9 @@ function drawChart(chart, labels, values, type) {
                 }
             } : (!hasCartesianScale ? {} : {
                 x: {
-                    min: type === "horizontalBar" ? minValue - 1 : (type === "scatter" ? scatterXBounds.min : undefined),
-                    max: type === "horizontalBar" ? maxValue + 1 : (type === "scatter" ? scatterXBounds.max : undefined),
+                    min: type === "scatter" ? scatterXBounds.min : undefined,
+                    max: type === "scatter" ? scatterXBounds.max : undefined,
+                    beginAtZero: type === "horizontalBar",
                     grid: {
                         display: showGridlines
                     },
@@ -8359,8 +8898,9 @@ function drawChart(chart, labels, values, type) {
                     }
                 },
                 y: {
-                    min: type === "horizontalBar" ? undefined : (type === "scatter" ? scatterYBounds.min : chartMinValue - 1),
-                    max: type === "horizontalBar" ? undefined : (type === "scatter" ? scatterYBounds.max : chartMaxValue + 1),
+                    min: type === "scatter" ? scatterYBounds.min : undefined,
+                    max: type === "scatter" ? scatterYBounds.max : undefined,
+                    beginAtZero: type !== "scatter" && type !== "horizontalBar",
                     grid: {
                         display: showGridlines
                     },

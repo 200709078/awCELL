@@ -12,7 +12,7 @@ import path from "node:path";
 
 const APP_DIR = "awCELL";
 // Yalnız bunlar yüklenir (README, .gitignore, scripts/, node_modules/ gitmez).
-const SOURCES = ["index.html", "app.js", "style.css", "icons", "vendor"];
+const SOURCES = ["index.html", "app.js", "formula.js", "fileio.js", "style.css", "sw.js", "manifest.webmanifest", "icons", "vendor"];
 const dryRun = process.argv.includes("--dry-run");
 const localDir = path.resolve(".");
 

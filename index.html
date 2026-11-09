@@ -1,24 +1,26 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="tr" lang="tr">
+<html lang="tr">
 
 <head>
-    <title>awCELL</title>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html" charset="UTF-8">
-    <meta name="keywords" content="Graph, awCELL, Tablolama">
+    <title>awCELL</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="mADEMatik Solutions">
+    <meta name="description" content="awCELL: tarayıcıda çalışan, kurulum gerektirmeyen elektronik tablo. Excel ve LibreOffice dosyalarını açar ve kaydeder.">
+    <meta name="keywords" content="awCELL, elektronik tablo, tablolama, Excel, xlsx, ods">
     <meta name="author" content="mADEMatik Solutions">
-    <link rel="stylesheet" href="style.css" type="text/css" />
-    <link rel="shortcut icon" href="icons/favicon.svg" />
+    <meta name="theme-color" content="#188038">
+    <link rel="stylesheet" href="style.css?v=20261110" type="text/css" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/app-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
 </head>
 
 <body>
     <main id="app-shell">
         <header id="top-bar">
-            <h2 class="app-logo">
+            <h1 class="app-logo">
                 <img src="icons/logo.svg" alt="awCELL" />
-            </h2>
+            </h1>
             <section id="menu-bar" aria-label="Ana menü">
                 <nav class="text-menu">
                     <div class="menu-shell">
@@ -39,7 +41,12 @@
                             </button>
                             <button id="save-as-file-btn" type="button">
                                 <img src="icons/save-as.svg" alt="" />
-                                <span>Farklı kaydet</span>
+                                <span>Farklı kaydet / Dışa aktar</span>
+                            </button>
+                            <hr>
+                            <button id="print-file-btn" type="button">
+                                <img src="icons/print.svg" alt="" />
+                                <span>Yazdır</span>
                             </button>
                         </div>
                     </div>
@@ -96,7 +103,7 @@
                             <hr>
                             <button id="menu-find-btn" type="button">
                                 <img src="icons/search.svg" alt="" />
-                                <span>Arama</span>
+                                <span>Bul ve değiştir</span>
                             </button>
                         </div>
                     </div>
@@ -339,6 +346,19 @@
                             <button id="menu-merge-btn" type="button">
                                 <img src="icons/merge-cells.svg" alt="" />
                                 <span>Hücreleri birleştir</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="menu-shell">
+                        <button id="help-menu-btn" type="button">Yardım</button>
+                        <div id="help-menu" class="text-menu-popover" hidden>
+                            <button type="button" data-help-action="functions">
+                                <img src="icons/function.svg" alt="" />
+                                <span>Formüller</span>
+                            </button>
+                            <button type="button" data-help-action="shortcuts">
+                                <img src="icons/keyboard.svg" alt="" />
+                                <span>Klavye kısayolları</span>
                             </button>
                         </div>
                     </div>
@@ -636,11 +656,32 @@
         </section>
 
         <a id="made-signature" href="https://www.madematik.com" target="_blank" rel="noopener noreferrer">
-            <span>m</span><span class="made-highlight">ADEM</span><span>atik</span>
+            <span>m</span><span class="made-highlight">ADEM</span><span>atik Solutions</span>
         </a>
     </main>
 
-    <input id="open-file-input" class="hidden-file-input" type="file" accept=".awc,application/json" />
+    <input id="open-file-input" class="hidden-file-input" type="file"
+        accept=".awc,.xlsx,.xlsm,.ods,.csv,.tsv,.txt,.xls,application/json,text/csv" />
+
+    <div id="restore-bar" role="status" hidden>
+        <span class="restore-bar-text"></span>
+        <button class="restore-bar-restore" type="button">Geri yükle</button>
+        <button class="restore-bar-dismiss" type="button">Kapat</button>
+    </div>
+
+    <div id="app-toast" role="status" hidden></div>
+
+    <dialog id="app-dialog" aria-labelledby="app-dialog-title">
+        <form method="dialog" class="app-dialog-body" onsubmit="return false">
+            <h2 id="app-dialog-title" class="app-dialog-title"></h2>
+            <p class="app-dialog-message"></p>
+            <div class="app-dialog-fields"></div>
+            <div class="app-dialog-actions">
+                <button class="app-dialog-cancel" type="button"></button>
+                <button class="app-dialog-confirm" type="button">Tamam</button>
+            </div>
+        </form>
+    </dialog>
 
     <div id="context-menu" hidden>
         <button type="button" data-action="cut">
@@ -718,6 +759,10 @@
             <img src="icons/note.svg" alt="" />
             <span>Not ekle</span>
         </button>
+        <button type="button" data-action="delete-note">
+            <img src="icons/trash.svg" alt="" />
+            <span>Notu sil</span>
+        </button>
     </div>
 
     <div id="border-menu" class="toolbar-menu" hidden>
@@ -789,7 +834,14 @@
     </div>
 
     <script src="vendor/chart.js"></script>
-    <script src="app.js"></script>
+    <script src="formula.js?v=20261110"></script>
+    <script src="fileio.js?v=20261110"></script>
+    <script src="app.js?v=20261110"></script>
+    <script>
+        if ("serviceWorker" in navigator && location.protocol === "https:") {
+            navigator.serviceWorker.register("sw.js").catch(() => {});
+        }
+    </script>
 </body>
 
 </html>

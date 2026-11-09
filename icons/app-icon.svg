@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>awCELL</title>
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <!-- Üstte basık AW: A üç doğru parçası, W dört doğru parçası (kardeş uygulamalardaki gibi) -->
+  <g stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M168 146L203 84L238 146M180 125H226" stroke="#2563eb"/>
+    <path d="M250 84L268 146L297 102L326 146L344 84" stroke="#e11d48"/>
+  </g>
+  <!-- Elektronik tablo: başlık satırı ve sütunu açık yeşil -->
+  <g fill="#e6f4ea">
+    <path d="M84 192H428V248H84Z"/>
+    <path d="M84 248H148V440H84Z"/>
+  </g>
+  <g fill="none" stroke="#94a3b8" stroke-width="6">
+    <path d="M148 192V440M242 192V440M336 192V440"/>
+    <path d="M84 248H428M84 312H428M84 376H428"/>
+  </g>
+  <rect x="84" y="192" width="344" height="248" rx="10" fill="none" stroke="#1f2937" stroke-width="12"/>
+  <!-- Seçili hücre ve doldurma tutamacı -->
+  <rect x="242" y="312" width="94" height="64" fill="#ffffff" stroke="#188038" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="320" y="360" width="30" height="30" fill="#188038" stroke="#ffffff" stroke-width="6"/>
+</svg>

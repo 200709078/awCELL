@@ -1,0 +1,16 @@
+{
+  "name": "awCELL",
+  "short_name": "awCELL",
+  "description": "Tarayıcıda çalışan elektronik tablo",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#188038",
+  "icons": [
+    { "src": "icons/app-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/app-icon.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
