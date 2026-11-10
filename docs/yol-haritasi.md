@@ -150,6 +150,12 @@ değişiklikler (Android uyarlaması) bittikten sonra. İmza: `ANDROID_KEYSTORE_
 secret'ları Claude yükleyebilir; iki parola (`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`) kullanıcı
 tarafından `gh secret set` ile girilir.
 
+**v1.0.0 yayımlandı (2026-11-10, kullanıcı yetkisiyle):** https://github.com/200709078/awCELL/releases/tag/v1.0.0 —
+`awCELL-android.apk` (3 MB), `awCELL-linux-amd64.deb`, `awCELL-linux-x86_64.AppImage`, `awCELL-win-x64.exe`,
+`SHA256SUMS.txt`. APK imzası kardeşlerle aynı (sertifika SHA-256 `84f78df0…b856f1fa96`, iş akışı kaydında doğrulandı).
+Play için imzalı AAB `play-Android` artifact'ı olarak 30 gün saklanır (`gh run download --name play-Android`).
+Web sürümü aynı gün canlıda. Sıradaki: 5. adım (Play Store) ve "Daha çok satır ve sütun".
+
 **Ayrıntılar ve açık sorular:**
 - "Birlikte aç": `.awc` awCELL'in kendi dosyası. `.xlsx`, `.ods`, `.csv` yalnız "Birlikte aç" listesine girsin,
   varsayılan program olmasın (LibreOffice'in yerini almasın) — öneri.
