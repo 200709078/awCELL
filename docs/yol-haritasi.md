@@ -158,8 +158,11 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    4. Dahili test: AAB'yi yükle, telefonda Play'den kurup dene.
    5. Kapalı test: en az 12 testçi, kesintisiz 14 gün (awPDF'teki testçi listesi kullanılabilir).
    6. Üretim erişimi başvurusu ve yayın.
-   Açık soru: Play sırasında (awPDF → drAW → drAW2D → drAW3D) awCELL'in yeri; kapalı test awPDF'inkiyle aynı
-   anda yürüyebilir (her uygulamanın 14 günü ayrı sayılır).
+   Kapalı test awPDF'inkiyle aynı anda yürüyebilir (her uygulamanın 14 günü ayrı sayılır).
+   **Kullanıcı kararı (2026-11-10):** awCELL şimdilik Play'e yüklenmiyor; awPDF Play'de yayına girdikten sonra
+   kullanıcı duruma göre karar verecek. Hazırlık bitti; o gün yeni bir sürüm çıkmışsa AAB son sürümün
+   `play-Android` artifact'ından alınır (artifact 30 gün saklanır; süresi geçmişse iş akışı `yayinla=false` ile
+   yeniden çalıştırılır) ve `magaza.md`'deki sürüm notu güncellenir.
 
 **Kullanıcı kararı (2026-11-10):** APK de GitHub sürümünde, kardeşlerle aynı imzayla yayımlanır; bütün
 paketler (deb, AppImage, exe, apk) GitHub sürümünde. Sürüm 1.0.0'dan başlar (yalnız awCELL), gerekli
@@ -178,7 +181,7 @@ Web sürümü aynı gün canlıda. Sıradaki: 5. adım (Play Store) ve "Daha ço
   varsayılan program olmasın (LibreOffice'in yerini almasın) — öneri.
 - Çevrimdışı önbellek (`sw.js`) yalnız web sürümünde; paketli uygulamada kayıt edilmez.
 - Tahtada çok yazı yazılacağı için awPDF / drAW'daki ekran klavyesi awCELL'e de alınmalı.
-- Play sırası (awPDF → drAW → drAW2D → drAW3D) içinde awCELL'in yeri kullanıcıya sorulacak.
+- Play: awPDF yayına girdikten sonra kullanıcı karar verecek (2026-11-10).
 
 ## Daha çok satır ve sütun (2026-11-10, kullanıcı isteği)
 
