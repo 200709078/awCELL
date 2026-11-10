@@ -206,3 +206,19 @@ Kullanıcı: varsayılan 100 satır; mümkün olduğunca satır ve sütun sayıs
   sürerken kaydırma yeniden çizmez. 3000 satırda kaydırma başına çizim ~13 ms (masaüstü). Denendi: 3000 satırlık CSV
   ile fare, klavye, Ad kutusu, geri alma, tümünü seç, dondurma, birleştirme ve dokunma taklidi. Bu sırada eskiden
   beri olan bir hata düzeltildi: Ad kutusuna "C5" yazıp Enter'a basınca C6 seçiliyordu.
+
+## Hakkında penceresi (2026-11-10, kullanıcı kararı; drAW2D'de uygulandı; bu projede kodlanmadı)
+
+Kullanıcı: "Hakkında yardım gibi ayrı pencerede açılsa nasıl olur?" → "tamam öyle yapalım. Diğer kardeşlere de bunu not et
+(özellikle hakkında kısmı hepsinde olmalı)." Aile kuralı: drAW, drAW2D, drAW3D, awPDF ve awCELL'in **hepsinde** Hakkında olur.
+
+- **Ayrı küçük pencere:** uygulamanın yardım/diyalog pencereleriyle aynı görünüş (başlık şeridi, ×). Kapanma: ×, dışarıya
+  dokunma, Esc, Android geri tuşu.
+- **İçerik:** uygulamanın simgesi, adı ve sürümü (`package.json`'dan otomatik), bir satırlık açıklama; mADEMatik Solutions ve
+  madematik.com bağlantısı; indirme bağlantısı (GitHub sürümleri: Linux, Windows, Android); lisans MIT; "Öneri ve sorunlar:
+  ademvarol@madematik.com" (seçilebilir düz yazı; e-posta bağlantıları tahtada ve telefonda çoğu zaman bir şey açmaz).
+- **Bağlantılar** sistemin tarayıcısında açılır (Electron: `shell.openExternal`; Android: uygulamanın içinde değil, tarayıcıda).
+- **Yer:** Dosya menüsünün en altı (drAW2D kararı); Yardım da hem çubukta hem Dosya menüsünde kalır.
+- **awCELL'e uyarlama (öneri):** awCELL'in üst menüsünde "Yardım" menüsü var; Hakkında onun en altına girer. Sağ alttaki
+  "mADEMatik Solutions" imzası kalabilir ya da Hakkında'ya taşınabilir; gizlilik politikası bağlantısı da Hakkında'ya eklenir.
+
