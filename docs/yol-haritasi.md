@@ -119,8 +119,28 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
 3. **Dokunmatik uyarlama:** tablo fare olaylarıyla çalışıyor; telefonda ve tahtada sürükleyerek aralık seçme,
    sütun/satır boyutlandırma, doldurma tutamacı ve sağ tık menüsü (uzun basma) çalışmıyor. Bugün web
    sürümünde tahtada da geçerli.
+   **Yapıldı (2026-11-10):** dokunmak seçer, çift dokunmak düzenler, parmakla sürüklemek kaydırır; seçimin köşesindeki
+   yuvarlak tutamaçla aralık seçilir (kenara gelince tablo kayar); satır numarası / sütun harfi üzerinde sürüklemek
+   birden çok satır/sütun seçer; boyutlandırma tutamacı dokunmada yalnız seçili satırın/sütunun başlığında, geniş;
+   uzun basmak sağ tık menüsünü açar; formül yazarken dokunulan hücre başvuru olur; dondurma çizgisi ve grafik
+   penceresi parmakla taşınır. Pencere düzeyindeki sürüklemeler pointer olaylarına geçti (fare aynı).
+   Dar ekran (telefon): üst çubuk sığar (küçük logo, menü şeridi yana kayar, menüler düğmenin altına), yükseklik
+   `100dvh` (adres çubuğu yüzünden sayfa sekmeleri görünmüyordu). Farede de bir hata düzeltildi: formülde
+   tıklanan başvuru, fare üstünden geçen hücrelerle değişmeye devam ediyordu.
+   Denendi: masaüstü Chromium'da dokunma taklidiyle ve telefonda (Xiaomi, Chrome 156) adb ile gerçek dokunuşla.
+   Denenmedi: akıllı tahta (ETAP). Yapılmadı: sayfa sekmelerini dokunarak sürükleyip sıralama, seçimi kenarından
+   tutup taşıma (ikisi farede var).
 4. **Android (.apk):** dosya kaydetme/açma (indirme bağlantısı Android'de çalışmaz; awPDF'teki gibi dosya ve
    paylaşma eklentisi), yazdırma, "Birlikte aç".
+   **Yapıldı (2026-11-10):** Capacitor 8.5.3, `android/` (sürüm `package.json`'dan, imza secret'lardan, deneme kopyası
+   `.deneme` / "awCELL Deneme"), internet izni yok. `AwCellNativePlugin.java` + `src/android.js`: Aç ve Farklı kaydet
+   Android'in dosya ekranlarıyla (Farklı kaydet önce biçimi sorar), Kaydet açık dosyanın üstüne yazar (izin yoksa
+   kaydet ekranı), "Birlikte aç" (.xlsx/.ods/.csv türleriyle, .awc adıyla), yazdırma Android'in yazdırma hizmetiyle
+   (sayfa görüntüleri), geri tuşu önce açık menü/pencere/düzenlemeyi kapatır, yoksa uygulamayı arka plana alır.
+   Android simgeleri `npm run icons` ile. Telefonda (Xiaomi, Android 13) gerçek dokunuşla denendi: veri ve formül,
+   .awc kaydetme, Kaydet, Aç, geri tuşu, yazdırma önizlemesi, "Birlikte aç" (.xlsx). Son tam denemede kaydetme
+   ekranında zaman aşımı oldu (önceki iki tam deneme geçmişti; telefon kullanıcıya geri verildi) — gerçek
+   kullanımda kaydetme bir kez daha denenmeli. Paylaş (başka uygulamaya gönder) yok.
 5. **Play Store:** imzalı .aab (`play-Android` artifact'ı), gizlilik politikası (awPDF `gizlilik.html` örnek),
    mağaza simgesi ve ekran görüntüleri.
 
@@ -136,3 +156,14 @@ tarafından `gh secret set` ile girilir.
 - Çevrimdışı önbellek (`sw.js`) yalnız web sürümünde; paketli uygulamada kayıt edilmez.
 - Tahtada çok yazı yazılacağı için awPDF / drAW'daki ekran klavyesi awCELL'e de alınmalı.
 - Play sırası (awPDF → drAW → drAW2D → drAW3D) içinde awCELL'in yeri kullanıcıya sorulacak.
+
+## Daha çok satır ve sütun (2026-11-10, kullanıcı isteği; kodlanmadı)
+
+Kullanıcı: varsayılan 100 satır; mümkün olduğunca satır ve sütun sayısı artırılsın.
+
+- Bugün: varsayılan 100 satır × 26 sütun; içe aktarımda en çok 5000 satır × 200 sütun. Tablo bütün hücreleriyle
+  DOM'a çiziliyor; 2000 satırda tam yeniden çizim ~0,5 sn (masaüstü). Telefonda/tahtada birkaç kat yavaş (tahmin).
+- **Seçenek 1 (küçük):** varsayılan 200 × 52 (A–AZ); kaydırarak sona yaklaşınca 100 satır / 26 sütun kendiliğinden eklenir.
+- **Seçenek 2 (büyük, öneri):** yalnız görünen hücreleri çizmek (sanal kaydırma). 10.000 × 200 bile hızlı olur; çizim,
+  birleştirme, dondurma, seçim ve satır yükseklikleri yeniden yazılır, kapsamlı test gerekir.
+- Önerilen sıra: Android ve v1.0.0 şimdiki sayılarla; ardından seçenek 2 ayrı adım. Karar kullanıcıda.

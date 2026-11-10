@@ -28,7 +28,11 @@
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux AppImage deb",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "icons": "bash scripts/icons.sh"
+    "icons": "bash scripts/icons.sh",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
+    "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "build": {
     "appId": "com.madematik.awcell",
@@ -99,6 +103,9 @@
     }
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "basic-ftp": "^6.2.3",
     "chart.js": "4.5.1",
     "dotenv": "^17.4.2",

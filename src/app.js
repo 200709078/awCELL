@@ -8,6 +8,7 @@ import Chart from "chart.js/auto";
 import AwFileIO from "./fileio.js";
 import AwFormula from "./formula.js";
 import { isDesktopApp, setupDesktop } from "./desktop.js";
+import { isAndroidApp, printImagesOnAndroid, setupAndroid } from "./android.js";
 // Butonlar sığmazsa alt satıra geçilsin.
 
 const table = document.getElementById("data-table");
@@ -240,6 +241,15 @@ let isEditing = false;
 // "enter": hücreye yazarak girildi, oklar hücreden çıkar; "edit": F2/çift tık, oklar imleci taşır.
 let editMode = "enter";
 let formulaPointState = null;
+// Dokunmatik katman (aşağıda "Dokunmatik" bölümü).
+const TOUCH_DOUBLE_TAP_MS = 400;
+const TOUCH_DOUBLE_TAP_DISTANCE = 24;
+const TOUCH_AUTOSCROLL_EDGE = 32;
+const TOUCH_AUTOSCROLL_STEP = 14;
+let touchHeaderDrag = null;
+let touchHandleDrag = null;
+let lastTouchTap = null;
+let touchSelectionHandle = null;
 let editBackupValue = "";
 let formulaInputBackupValue = "";
 let activeFilter = null;
@@ -2991,7 +3001,7 @@ function renderFreezeDividers(frozenTop, frozenLeft) {
         rowDivider.className = "freeze-divider freeze-row-divider";
         rowDivider.dataset.freezeTop = String(frozenTop);
         rowDivider.title = "Donmuş satır sınırını taşı";
-        rowDivider.addEventListener("mousedown", (e) => startFreezeDividerDrag(e, "row"));
+        rowDivider.addEventListener("pointerdown", (e) => startFreezeDividerDrag(e, "row"));
         tableArea.appendChild(rowDivider);
     }
 
@@ -3000,7 +3010,7 @@ function renderFreezeDividers(frozenTop, frozenLeft) {
         colDivider.className = "freeze-divider freeze-col-divider";
         colDivider.dataset.freezeLeft = String(frozenLeft);
         colDivider.title = "Donmuş sütun sınırını taşı";
-        colDivider.addEventListener("mousedown", (e) => startFreezeDividerDrag(e, "column"));
+        colDivider.addEventListener("pointerdown", (e) => startFreezeDividerDrag(e, "column"));
         tableArea.appendChild(colDivider);
     }
 
@@ -4707,7 +4717,7 @@ async function writeSaveFile(blob, fileName, types = [AWC_FILE_TYPE]) {
     };
 }
 
-/** Masaüstünde önce biçim sorulur: sistemin kaydetme penceresi seçilen filtreyi bildirmez. */
+/** Masaüstünde ve Android'de önce biçim sorulur: sistemin kaydetme ekranı seçilen biçimi bildirmez. */
 async function askDesktopSaveFormat() {
     const result = await showAppDialog({
         title: "Farklı kaydet",
@@ -4725,7 +4735,7 @@ async function writeSaveAsFile(defaultName) {
     if ("showSaveFilePicker" in window) {
         let extension = "awc";
         let types = SAVE_AS_FILE_TYPES;
-        if (isDesktopApp()) {
+        if (isDesktopApp() || isAndroidApp()) {
             const format = await askDesktopSaveFormat();
             if (!format) return false;
             ({ extension, types } = format);
@@ -4742,6 +4752,7 @@ async function writeSaveAsFile(defaultName) {
 
         await writable.write(blob);
         await writable.close();
+        fileName = handle.name || fileName;
         updateNextSaveNumber(fileName);
         setCurrentWorkbookFile(fileName, getFileExtension(fileName) === "awc" ? handle : null);
         return true;
@@ -5194,6 +5205,7 @@ function renderSelection() {
     updateFormulaBar();
     updateToolbarState();
     updateStatusSummary();
+    updateTouchSelectionHandle();
 }
 
 function getCellSizeStyle(row, col, merge, zoomScale) {
@@ -5632,6 +5644,164 @@ function handleTableContextMenu(e) {
     showContextMenu(e, { type: "cell", row: r, col: c });
 }
 
+/* ---------- Dokunmatik (telefon, tablet, akıllı tahta) ----------
+ * Fare olayları değişmeden kalır. Dokunmada:
+ * - hücreye dokunmak seçer (tarayıcının uyumluluk fare olaylarıyla, farede olduğu gibi), çift dokunmak
+ *   düzenler, parmakla sürüklemek tabloyu kaydırır;
+ * - seçimin köşesindeki tutamaç sürüklenerek aralık seçilir;
+ * - satır numarası / sütun harfi üzerinde sürüklemek birden çok satır / sütun seçer;
+ * - boyutlandırma tutamaçları dokunmada daha geniştir; uzun basmak sağ tık menüsünü açar (tarayıcı).
+ */
+
+function setTouchInputMode(isTouch) {
+    if (document.body.classList.contains("touch-input") === isTouch) return;
+    document.body.classList.toggle("touch-input", isTouch);
+    updateTouchSelectionHandle();
+}
+
+window.addEventListener("pointerdown", (e) => setTouchInputMode(e.pointerType !== "mouse"), true);
+
+function handleTableTouchPointerDown(e) {
+    if (e.pointerType === "mouse" || !e.isPrimary) return;
+
+    const resizeHandle = e.target.closest(".col-resize-handle, .row-resize-handle");
+    if (resizeHandle) {
+        const th = resizeHandle.closest("th");
+        if (resizeHandle.classList.contains("col-resize-handle")) startColumnResize(e, Number(th.dataset.col));
+        else startRowResize(e, Number(th.dataset.row));
+        return;
+    }
+    if (e.target.closest(".cell-filter-btn")) return;
+
+    const th = e.target.closest("th.column-header, th.row-header");
+    if (th) {
+        // Uyumluluk fare olayları gelmez (preventDefault); seçim burada başlar, sürükleme pointermove'da.
+        e.preventDefault();
+        if (resizeState) return;
+        if (isEditing) exitEditMode(true);
+        const type = th.classList.contains("column-header") ? "column" : "row";
+        startHeaderSelection(type, Number(type === "column" ? th.dataset.col : th.dataset.row));
+        touchHeaderDrag = { type };
+        return;
+    }
+
+    const td = e.target.closest("td[data-row]");
+    if (!td || td.classList.contains("editing")) return;
+    const { row, col } = getEventCellPosition(td);
+
+    if (isEditing) {
+        if (canInsertFormulaReference()) {
+            e.preventDefault();
+            suppressClickAfterPoint = true;
+            startFormulaPointReference(row, col);
+        }
+        return;
+    }
+
+    const now = performance.now();
+    const isDoubleTap = lastTouchTap &&
+        lastTouchTap.row === row && lastTouchTap.col === col &&
+        now - lastTouchTap.time < TOUCH_DOUBLE_TAP_MS &&
+        Math.hypot(e.clientX - lastTouchTap.x, e.clientY - lastTouchTap.y) < TOUCH_DOUBLE_TAP_DISTANCE;
+    lastTouchTap = isDoubleTap ? null : { row, col, time: now, x: e.clientX, y: e.clientY };
+    if (isDoubleTap) {
+        e.preventDefault();
+        clearClipboardState();
+        selectSingleCell(row, col);
+        renderSelection();
+        enterEditMode(row, col);
+    }
+    // Tek dokunuş: tarayıcının uyumluluk fare olayları seçer (handleTableMouseDown); sürükleme kaydırır.
+}
+
+function getTouchTarget(e, selector) {
+    return document.elementFromPoint(e.clientX, e.clientY)?.closest(selector) ?? null;
+}
+
+function updateTouchHeaderDrag(e) {
+    e.preventDefault();
+    const selector = touchHeaderDrag.type === "column" ? "th.column-header" : "th.row-header";
+    const th = getTouchTarget(e, selector);
+    autoScrollTableArea(e);
+    if (!th) return;
+    updateHeaderSelection(touchHeaderDrag.type, Number(touchHeaderDrag.type === "column" ? th.dataset.col : th.dataset.row));
+}
+
+/** Parmak tablonun kenarına yaklaşınca tablo o yöne kayar. */
+function autoScrollTableArea(e) {
+    if (!tableArea) return;
+    const rect = tableArea.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (e.clientX < rect.left + TOUCH_AUTOSCROLL_EDGE) dx = -TOUCH_AUTOSCROLL_STEP;
+    else if (e.clientX > rect.right - TOUCH_AUTOSCROLL_EDGE) dx = TOUCH_AUTOSCROLL_STEP;
+    if (e.clientY < rect.top + TOUCH_AUTOSCROLL_EDGE) dy = -TOUCH_AUTOSCROLL_STEP;
+    else if (e.clientY > rect.bottom - TOUCH_AUTOSCROLL_EDGE) dy = TOUCH_AUTOSCROLL_STEP;
+    if (dx || dy) tableArea.scrollBy(dx, dy);
+}
+
+function getTouchHandleCorner() {
+    if (!selectedCell || !["cell", "range"].includes(selectionMode)) return null;
+    const range = getActiveRange();
+    if (!range) return null;
+    const corner = resolveMergedPosition({ row: range.maxRow, col: range.maxCol });
+    return getCellElement(corner.row, corner.col);
+}
+
+/** Aralık seçme tutamacı: yalnız dokunmada, hücre ya da aralık seçiliyken, seçimin sağ alt köşesinde. */
+function updateTouchSelectionHandle() {
+    if (!tableArea) return;
+    const corner = document.body.classList.contains("touch-input") && !isEditing ? getTouchHandleCorner() : null;
+    if (!corner) {
+        if (touchSelectionHandle) touchSelectionHandle.hidden = true;
+        return;
+    }
+    if (!touchSelectionHandle) {
+        touchSelectionHandle = document.createElement("div");
+        touchSelectionHandle.className = "touch-selection-handle";
+        touchSelectionHandle.title = "Sürükleyerek seçimi genişletin";
+        touchSelectionHandle.addEventListener("pointerdown", startTouchHandleDrag);
+        tableArea.appendChild(touchSelectionHandle);
+    }
+    const areaRect = tableArea.getBoundingClientRect();
+    const cellRect = corner.getBoundingClientRect();
+    touchSelectionHandle.hidden = false;
+    touchSelectionHandle.style.left = `${cellRect.right - areaRect.left + tableArea.scrollLeft}px`;
+    touchSelectionHandle.style.top = `${cellRect.bottom - areaRect.top + tableArea.scrollTop}px`;
+}
+
+function startTouchHandleDrag(e) {
+    if (!selectedCell) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const range = getActiveRange();
+    touchHandleDrag = {
+        anchor: selectionMode === "range" && selectionRange ? { ...selectionRange.start } : { ...selectedCell },
+        last: range ? `${range.maxRow}:${range.maxCol}` : ""
+    };
+}
+
+function updateTouchHandleDrag(e) {
+    e.preventDefault();
+    autoScrollTableArea(e);
+    const td = getTouchTarget(e, "td[data-row]");
+    if (!td) return;
+    const { row, col } = getEventCellPosition(td);
+    const key = `${row}:${col}`;
+    if (key === touchHandleDrag.last) return;
+    touchHandleDrag.last = key;
+    selectionMode = "range";
+    extraSelections = [];
+    selectionRange = { start: { ...touchHandleDrag.anchor }, end: { row, col } };
+    selectedCell = { ...touchHandleDrag.anchor };
+    renderSelection();
+}
+
+tableArea?.addEventListener("scroll", () => {
+    if (touchSelectionHandle && !touchSelectionHandle.hidden) updateTouchSelectionHandle();
+}, { passive: true });
+
+table.addEventListener("pointerdown", handleTableTouchPointerDown);
 table.addEventListener("mousedown", handleTableMouseDown);
 table.addEventListener("mouseover", handleTableMouseOver);
 table.addEventListener("mousemove", handleTableMouseMove);
@@ -5671,7 +5841,7 @@ function positionToolbarPanel(group) {
     const top = groupRect.bottom + 4;
     panel.style.maxHeight = `${Math.max(120, window.innerHeight - top - TOOLBAR_SCREEN_MARGIN)}px`;
     const panelWidth = panel.getBoundingClientRect().width;
-    const left = Math.min(groupRect.left, window.innerWidth - panelWidth - TOOLBAR_SCREEN_MARGIN);
+    const left = Math.min(groupRect.left, document.documentElement.clientWidth - panelWidth - TOOLBAR_SCREEN_MARGIN);
     panel.style.left = `${Math.max(TOOLBAR_SCREEN_MARGIN, left)}px`;
     panel.style.top = `${top}px`;
 }
@@ -5696,7 +5866,7 @@ function positionToolbarMenu() {
     const buttonRect = toolbarMenuBtn.getBoundingClientRect();
     const top = buttonRect.bottom + 4;
     toolbarMenu.style.top = `${top}px`;
-    toolbarMenu.style.right = `${Math.max(TOOLBAR_SCREEN_MARGIN, window.innerWidth - buttonRect.right)}px`;
+    toolbarMenu.style.right = `${Math.max(TOOLBAR_SCREEN_MARGIN, document.documentElement.clientWidth - buttonRect.right)}px`;
     toolbarMenu.style.maxHeight = `${Math.max(160, window.innerHeight - top - TOOLBAR_SCREEN_MARGIN)}px`;
 }
 
@@ -5932,6 +6102,22 @@ function setupToolbarGroups() {
 }
 
 setupToolbarGroups();
+
+/** Dar ekranda (style.css "Dar ekran") üst menüler kayan şeridin dışına, düğmenin altına yerleşir. */
+function positionNarrowTextMenu(popover) {
+    if (popover.hidden || getComputedStyle(popover).position !== "fixed") return;
+    const button = popover.parentElement?.querySelector(":scope > button");
+    if (!button) return;
+    const buttonRect = button.getBoundingClientRect();
+    const width = popover.getBoundingClientRect().width;
+    const viewportWidth = document.documentElement.clientWidth;
+    popover.style.left = `${Math.max(8, Math.min(buttonRect.left, viewportWidth - width - 8))}px`;
+    popover.style.top = `${buttonRect.bottom + 2}px`;
+}
+
+document.querySelectorAll(".text-menu > .menu-shell > .text-menu-popover").forEach((popover) => {
+    new MutationObserver(() => positionNarrowTextMenu(popover)).observe(popover, { attributes: true, attributeFilter: ["hidden"] });
+});
 // === EVENTS ===
 undoBtn.addEventListener("click", undo);
 redoBtn.addEventListener("click", redo);
@@ -6334,9 +6520,12 @@ showAxisBtn?.addEventListener("click", () => {
 
 tableArea?.addEventListener("scroll", updateFreezeDividerPositions);
 
-window.addEventListener("mouseup", () => {
-    finishFreezeDividerDrag();
-});
+// Sürüklemelerin sonu: fare ve dokunma (pointer olayları); "mouseup" dokunmadaki uyumluluk olayları için.
+for (const type of ["pointerup", "pointercancel", "mouseup"]) {
+    window.addEventListener(type, () => {
+        finishFreezeDividerDrag();
+    });
+}
 
 freezeAxisBtn?.addEventListener("click", () => {
     if (freezeAxisBtn.disabled) return;
@@ -7300,7 +7489,17 @@ contextMenu?.addEventListener("click", (e) => {
     hideContextMenu();
 });
 
-window.addEventListener("mousemove", (e) => {
+window.addEventListener("pointermove", (e) => {
+    if (touchHeaderDrag) {
+        updateTouchHeaderDrag(e);
+        return;
+    }
+
+    if (touchHandleDrag) {
+        updateTouchHandleDrag(e);
+        return;
+    }
+
     if (freezeDragState) {
         e.preventDefault();
         updateFreezeDividerDrag(e);
@@ -7349,7 +7548,7 @@ window.addEventListener("mousemove", (e) => {
     }
 });
 
-window.addEventListener("mouseup", () => {
+function finishPointerDrag() {
     if (chartDragState || chartResizeState) {
         scheduleAutoSave();
     }
@@ -7359,7 +7558,18 @@ window.addEventListener("mouseup", () => {
     isMouseSelecting = false;
     headerSelectionState = null;
     resizeState = null;
-});
+    touchHeaderDrag = null;
+    if (touchHandleDrag) {
+        touchHandleDrag = null;
+        updateToolbarState();
+    }
+    // Formül yazarken tıklanan başvuru bırakılınca sabitlenir; fare üstünden geçen hücreler değiştirmez.
+    if (formulaPointState) formulaPointState.dragging = false;
+}
+
+for (const type of ["pointerup", "pointercancel", "mouseup"]) {
+    window.addEventListener(type, finishPointerDrag);
+}
 
 /* ---------- Klavye ---------- */
 
@@ -7930,6 +8140,13 @@ async function printActiveSheet() {
     }
 
     const isLandscape = pages[0].widthPt > pages[0].heightPt;
+    if (isAndroidApp()) {
+        await printImagesOnAndroid(pages.map((page) => page.canvas.toDataURL("image/png")), {
+            landscape: isLandscape,
+            title: sheets[activeSheetIndex]?.name ?? "awCELL"
+        });
+        return true;
+    }
     const frame = document.createElement("iframe");
     frame.className = "print-frame";
     frame.setAttribute("aria-hidden", "true");
@@ -8412,7 +8629,7 @@ function createChartWindow(config = null, data = null, savedState = null, should
 }
 
 function bindChartWindowEvents(chart) {
-    chart.element.addEventListener("mousedown", (e) => {
+    chart.element.addEventListener("pointerdown", (e) => {
         if (e.target.closest(".chart-window-actions")) return;
         if (chart.element.classList.contains("minimized")) return;
 
@@ -8429,11 +8646,11 @@ function bindChartWindowEvents(chart) {
         toggleChartMinimize(chart);
     });
 
-    chart.element.querySelector(".chart-window-actions")?.addEventListener("mousedown", (e) => {
+    chart.element.querySelector(".chart-window-actions")?.addEventListener("pointerdown", (e) => {
         e.stopPropagation();
     });
 
-    chart.element.querySelector(".chart-titlebar")?.addEventListener("mousedown", (e) => {
+    chart.element.querySelector(".chart-titlebar")?.addEventListener("pointerdown", (e) => {
         if (e.button !== 0 || e.target.closest(".chart-window-actions")) return;
         if (chart.element.classList.contains("minimized")) return;
 
@@ -8450,7 +8667,7 @@ function bindChartWindowEvents(chart) {
     });
 
     chart.element.querySelectorAll("[data-chart-resize]").forEach((handle) => {
-        handle.addEventListener("mousedown", (e) => {
+        handle.addEventListener("pointerdown", (e) => {
             if (e.button !== 0 || chart.element.classList.contains("minimized")) return;
 
             e.preventDefault();
@@ -9369,6 +9586,53 @@ setupDesktop({
             showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
         }
     }
+});
+
+/** Android geri tuşu: açık olan bir şeyi kapatır; kapatacak bir şey yoksa false (uygulama arka plana geçer). */
+function handleAndroidBack() {
+    if (appDialog?.open) {
+        (appDialog.querySelector(".app-dialog-cancel:not([hidden])") ?? appDialog.querySelector(".app-dialog-confirm"))?.click();
+        return true;
+    }
+    if (isEditing) {
+        exitEditMode(true);
+        return true;
+    }
+    if (hasOpenToolbarPopup()) {
+        closeToolbarPopups();
+        return true;
+    }
+    const popups = [
+        ...document.querySelectorAll(".text-menu-popover, .color-palette-menu"),
+        contextMenu, zoomMenu, filterPopup
+    ].filter((element) => element && !element.hidden && element.getClientRects().length > 0);
+    if (popups.length) {
+        [hideFileMenu, hideEditMenu, hideViewMenu, hideInsertMenu, hideDataMenu, hideFormatMenu, hideHelpMenu,
+            hideContextMenu, hideZoomMenu, hideFilterPopup, hideColorPaletteMenus].forEach((hide) => hide());
+        return true;
+    }
+    if (findPanel && !findPanel.hidden) {
+        closeFindPanel();
+        return true;
+    }
+    if (chartSettingsPanel && !chartSettingsPanel.hidden) {
+        closeChartSettingsPanel();
+        return true;
+    }
+    return false;
+}
+
+// Android'de dosya ekranları, "Birlikte aç", yazdırma ve geri tuşu (src/android.js).
+setupAndroid({
+    openFile: async (file, handle) => {
+        if (isEditing) exitEditMode(true);
+        try {
+            await openWorkbookFile(file, handle);
+        } catch (error) {
+            showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
+        }
+    },
+    onBack: handleAndroidBack
 });
 
 // Çevrimdışı çalışma yalnız web sürümünde; Electron ve Android paketleri dosyaları zaten içinde taşır.

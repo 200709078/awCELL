@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Telefonda Play'den gelen awCELL'in yanında duran deneme kopyası böyle görünür. -->
+<resources>
+    <string name="app_name">awCELL Deneme</string>
+    <string name="title_activity_main">awCELL Deneme</string>
+</resources>

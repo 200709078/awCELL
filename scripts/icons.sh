@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bütün uygulama simgelerini public/icons/app-icon.svg'den üretir (Inkscape ve ImageMagick 7):
 # web (app-icon.png, app-icon-192.png, favicon.svg, logo.svg), Linux (build/icons) ve Windows
-# (build/icon.ico) paketleri. Çıktılar depoya girer; simge değişince yeniden çalıştırın:
+# (build/icon.ico) paketleri ve Android simgeleri. Çıktılar depoya girer; simge değişince yeniden çalıştırın:
 #   npm run icons
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,4 +17,5 @@ mkdir -p build/icons
 for size in 16 24 32 48 64 128 256 512; do render "$size" "build/icons/${size}x${size}.png"; done
 magick build/icons/256x256.png build/icons/128x128.png build/icons/64x64.png build/icons/48x48.png \
   build/icons/32x32.png build/icons/16x16.png build/icon.ico
+bash scripts/android-icons.sh
 echo "Simgeler public/icons/app-icon.svg'den üretildi."

@@ -97,8 +97,20 @@ pencereleridir; Ctrl+S açık `.awc` dosyasının üstüne yazar. Dosya yönetic
 Linux `.deb` ve AppImage, Windows `.exe`; drAW ailesi ve awPDF ile aynı iş akışıyla
 (`.github/workflows/release.yml`, `scripts/release-assets.mjs`; ikisi beş depoda birebir aynı) yalnız
 GitHub Releases'te, sürüm numarası olmayan adlarla yayımlanır. Sürüm: `npm version patch`, ardından etiket
-gönderilir. Yerelde Linux paketleri: `npm run dist:linux` → `release/`. Android paketi ve Google Play
-yol haritasında (`docs/yol-haritasi.md`).
+gönderilir. Yerelde Linux paketleri: `npm run dist:linux` → `release/`.
+
+## Android
+
+Capacitor ile (`android/`, `capacitor.config.json`); APK GitHub sürümünde, drAW ailesi ve awPDF ile aynı anahtarla
+imzalı (secret'lar: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`).
+Aç / Kaydet / Farklı kaydet Android'in dosya ekranlarıyla; "Birlikte aç" (.awc, .xlsx, .ods, .csv); yazdırma Android'in
+yazdırma hizmetiyle. Deneme kopyası (`com.madematik.awcell.deneme`, "awCELL Deneme") Play sürümünün yanına kurulur:
+
+```bash
+npm run android:debug   # android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Google Play yol haritasında (`docs/yol-haritasi.md`).
 
 ## Yayınlama
 
@@ -128,8 +140,10 @@ awCELL/
 │   ├── formula.js        # Formül motoru (belirteç → ayrıştırıcı → değerlendirici), başvuru dönüşümleri
 │   ├── fileio.js         # ZIP, XLSX, ODS, XLS (2003 XML), CSV, PDF; yazdırma sayfaları
 │   ├── desktop.js        # Masaüstü: başlık çubuğu, dosya pencereleri, "Birlikte aç"
+│   ├── android.js        # Android: dosya ekranları, "Birlikte aç", yazdırma, geri tuşu
 │   └── style.css         # Tema ve yerleşim
 ├── public/               # Olduğu gibi kopyalanır: icons/, sw.js, manifest.webmanifest
+├── android/              # Android projesi (Capacitor); AwCellNativePlugin.java
 ├── electron/             # Masaüstü: main.js (pencere), files.js (dosya pencereleri), preload.cjs
 ├── build/                # Paket simgeleri (icons/, icon.ico; npm run icons üretir)
 ├── tests/                # node --test testleri

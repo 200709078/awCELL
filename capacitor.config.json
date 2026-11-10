@@ -1,0 +1,10 @@
+{
+  "appId": "com.madematik.awcell",
+  "appName": "awCELL",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  }
+}
