@@ -88,16 +88,14 @@ const menuAlignBottomBtn = document.getElementById("menu-align-bottom-btn");
 const menuBorderBtn = document.getElementById("menu-border-btn");
 const menuMergeBtn = document.getElementById("menu-merge-btn");
 const contextMenu = document.getElementById("context-menu");
-const borderBtn = document.getElementById("border-btn");
-const borderMenu = document.getElementById("border-menu");
 const mergeBtn = document.getElementById("merge-btn");
 const zoomValueBtn = document.getElementById("zoom-value-btn");
+const zoomValueText = document.getElementById("zoom-value-text");
 const zoomMenu = document.getElementById("zoom-menu");
 const currencyFormatBtn = document.getElementById("currency-format-btn");
 const percentFormatBtn = document.getElementById("percent-format-btn");
 const decimalDecreaseBtn = document.getElementById("decimal-decrease-btn");
 const decimalIncreaseBtn = document.getElementById("decimal-increase-btn");
-const numberFormatMoreBtn = document.getElementById("number-format-more-btn");
 const numberFormatMenu = document.getElementById("number-format-menu");
 const boldBtn = document.getElementById("bold-btn");
 const italicBtn = document.getElementById("italic-btn");
@@ -105,8 +103,6 @@ const underlineBtn = document.getElementById("underline-btn");
 const strikethroughBtn = document.getElementById("strikethrough-btn");
 const fontSizeDecreaseBtn = document.getElementById("font-size-decrease-btn");
 const fontSizeIncreaseBtn = document.getElementById("font-size-increase-btn");
-const textColorBtn = document.getElementById("text-color-btn");
-const fillColorBtn = document.getElementById("fill-color-btn");
 const textColorInput = document.getElementById("text-color-input");
 const fillColorInput = document.getElementById("fill-color-input");
 const alignLeftBtn = document.getElementById("align-left-btn");
@@ -116,7 +112,17 @@ const alignJustifyBtn = document.getElementById("align-justify-btn");
 const alignTopBtn = document.getElementById("align-top-btn");
 const alignMiddleBtn = document.getElementById("align-middle-btn");
 const alignBottomBtn = document.getElementById("align-bottom-btn");
-const toolbarGroup = document.querySelector(".toolbar-group");
+const toolbarRow = document.getElementById("toolbar-row");
+const toolbarOverflow = toolbarRow?.querySelector(".tb-overflow") ?? null;
+const toolbarMenu = document.getElementById("toolbar-menu");
+const toolbarMenuBtn = document.getElementById("toolbar-menu-btn");
+const toolbarItems = toolbarRow ? Array.from(toolbarRow.querySelectorAll(":scope > .tb-item")) : [];
+const toolbarGroups = Array.from(document.querySelectorAll("#control-panel .tb-group"));
+/** Bölünmüş düğmenin (Hizalama, Kenarlık) büyük kısmının yapacağı iş: grubun içindeki son seçilen düğme. */
+const toolbarSplitTargets = new WeakMap();
+const TOOLBAR_MENU_ICON = '<path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+const TOOLBAR_CLOSE_ICON = '<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+const TOOLBAR_SCREEN_MARGIN = 8;
 const sheetTabs = document.getElementById("sheet-tabs");
 const tableArea = document.getElementById("sheet-scroll");
 const chartWindows = document.getElementById("chart-windows");
@@ -509,20 +515,16 @@ function updateToolbarState() {
     }
 
     [
-        borderBtn,
         boldBtn,
         italicBtn,
         underlineBtn,
         strikethroughBtn,
         fontSizeDecreaseBtn,
         fontSizeIncreaseBtn,
-        textColorBtn,
-        fillColorBtn,
         currencyFormatBtn,
         percentFormatBtn,
         decimalDecreaseBtn,
         decimalIncreaseBtn,
-        numberFormatMoreBtn,
         alignLeftBtn,
         alignCenterBtn,
         alignRightBtn,
@@ -553,6 +555,7 @@ function updateToolbarState() {
     const activeFillColor = normalizeColorValue(style.backgroundColor, "#fff2cc");
     if (fillColorInput) fillColorInput.value = activeFillColor;
     updateFillColorIndicator(activeFillColor);
+    updateToolbarGroupState(style, canUseSelection, isRowSelection, isColumnSelection);
     updateEditMenuState();
     updateInsertMenuState();
     updateDataMenuState();
@@ -561,14 +564,14 @@ function updateToolbarState() {
 
 function updateTextColorIndicator(color) {
     const normalizedColor = normalizeColorValue(color, "#202124");
-    [textColorBtn, menuTextColorBtn].forEach((button) => {
+    [menuTextColorBtn].forEach((button) => {
         button?.style.setProperty("--text-color-indicator", normalizedColor);
     });
 }
 
 function updateFillColorIndicator(color) {
     const normalizedColor = normalizeColorValue(color, "#fff2cc");
-    [fillColorBtn, menuFillColorBtn].forEach((button) => {
+    [menuFillColorBtn].forEach((button) => {
         button?.style.setProperty("--fill-color-indicator", normalizedColor);
     });
 }
@@ -656,7 +659,7 @@ function updateViewMenuState(settings = loadViewSettings()) {
     setCheck(menuViewGridlinesBtn, settings.gridlines);
 
     const zoom = normalizeZoom(settings.zoom);
-    if (zoomValueBtn) zoomValueBtn.textContent = `${zoom}%`;
+    if (zoomValueText) zoomValueText.textContent = `${zoom}%`;
     document.querySelectorAll("[data-zoom-value]").forEach((button) => {
         const isActive = Number(button.dataset.zoomValue) === zoom;
         button.classList.toggle("active", isActive);
@@ -829,12 +832,6 @@ function hideContextMenu() {
     contextMenu.hidden = true;
 }
 
-function hideBorderMenu() {
-    if (!borderMenu) return;
-
-    borderMenu.hidden = true;
-}
-
 function hideColorPaletteMenus() {
     document.querySelectorAll(".color-palette-menu").forEach((menu) => {
         menu.hidden = true;
@@ -845,12 +842,6 @@ function hideZoomMenu() {
     if (!zoomMenu) return;
 
     zoomMenu.hidden = true;
-}
-
-function hideNumberFormatMenu() {
-    if (!numberFormatMenu) return;
-
-    numberFormatMenu.hidden = true;
 }
 
 function hideChartTypeMenu() {
@@ -901,9 +892,7 @@ function openTextMenu(menuName) {
     hideDataMenu();
     hideFormatMenu();
     hideZoomMenu();
-    hideNumberFormatMenu();
     hideContextMenu();
-    hideBorderMenu();
     hideColorPaletteMenus();
 
     if (menuName === "file" && fileMenu) fileMenu.hidden = false;
@@ -980,19 +969,6 @@ function hideHelpMenu() {
     updateTextMenuActiveState();
 }
 
-function showBorderMenu(anchor = borderBtn) {
-    if (!anchor || !borderMenu) return;
-
-    const buttonRect = anchor.getBoundingClientRect();
-    borderMenu.hidden = false;
-    const menuRect = borderMenu.getBoundingClientRect();
-    const left = Math.min(buttonRect.left, window.innerWidth - menuRect.width - 8);
-    const top = Math.min(buttonRect.bottom + 4, window.innerHeight - menuRect.height - 8);
-
-    borderMenu.style.left = `${Math.max(8, left)}px`;
-    borderMenu.style.top = `${Math.max(8, top)}px`;
-}
-
 function showZoomMenu() {
     if (!zoomMenu || !zoomValueBtn) return;
 
@@ -1005,20 +981,6 @@ function showZoomMenu() {
 
     zoomMenu.style.left = `${Math.max(8, left)}px`;
     zoomMenu.style.top = `${Math.max(8, top)}px`;
-}
-
-function showNumberFormatMenu() {
-    if (!numberFormatMenu || !numberFormatMoreBtn) return;
-
-    const buttonRect = numberFormatMoreBtn.getBoundingClientRect();
-    numberFormatMenu.hidden = false;
-    updateNumberFormatMenuState();
-    const menuRect = numberFormatMenu.getBoundingClientRect();
-    const left = Math.min(buttonRect.left, window.innerWidth - menuRect.width - 8);
-    const top = Math.min(buttonRect.bottom + 4, window.innerHeight - menuRect.height - 8);
-
-    numberFormatMenu.style.left = `${Math.max(8, left)}px`;
-    numberFormatMenu.style.top = `${Math.max(8, top)}px`;
 }
 
 function createColorPaletteMenu(id, applyColor, resetLabel) {
@@ -1066,9 +1028,7 @@ function showColorPaletteMenu(menu, anchor) {
     if (!menu || !anchor) return;
 
     hideColorPaletteMenus();
-    hideBorderMenu();
     hideZoomMenu();
-    hideNumberFormatMenu();
     hideFilterPopup();
 
     const buttonRect = anchor.getBoundingClientRect();
@@ -5654,110 +5614,298 @@ table.addEventListener("click", handleTableClick);
 table.addEventListener("dblclick", handleTableDoubleClick);
 table.addEventListener("contextmenu", handleTableContextMenu);
 
-function setupToolbarCarousel() {
-    if (!toolbarGroup || toolbarGroup.dataset.carouselReady === "true") return;
+// === ARAÇ ÇUBUĞU GRUPLARI ===
+// Çubukta grup başına tek düğme ve ▾; tıklayınca açılır, aynı anda tek pencere açık kalır. Sığmayan
+// öğeler sondan başlayarak ☰ menüsüne geçer; orada gruplar yerinde (akordeon gibi) açılır. Düğmeler
+// aynı öğeler olarak taşınır: kimlikleri, olay dinleyicileri ve durumları tek kopyadır.
+// Kurallar: docs/yol-haritasi.md, "Ortak araç çubuğu stili".
 
-    const track = document.createElement("div");
-    track.className = "toolbar-track";
-    const leftButton = document.createElement("button");
-    const rightButton = document.createElement("button");
-
-    leftButton.type = "button";
-    leftButton.className = "toolbar-edge-btn toolbar-edge-btn-left";
-    leftButton.title = "Araçları sola kaydır";
-    leftButton.setAttribute("aria-label", "Araçları sola kaydır");
-    leftButton.textContent = "‹";
-
-    rightButton.type = "button";
-    rightButton.className = "toolbar-edge-btn toolbar-edge-btn-right";
-    rightButton.title = "Araçları sağa kaydır";
-    rightButton.setAttribute("aria-label", "Araçları sağa kaydır");
-    rightButton.textContent = "›";
-
-    while (toolbarGroup.firstChild) {
-        track.appendChild(toolbarGroup.firstChild);
-    }
-
-    toolbarGroup.appendChild(track);
-    toolbarGroup.appendChild(leftButton);
-    toolbarGroup.appendChild(rightButton);
-    toolbarGroup.dataset.carouselReady = "true";
-
-    let offsetX = 0;
-
-    const setTrackOffset = () => {
-        track.style.transform = `translateX(${offsetX}px)`;
+function getToolbarGroupParts(group) {
+    return {
+        button: group.querySelector(".tb-group-btn"),
+        panel: group.querySelector(".tb-panel"),
+        main: group.querySelector(".tb-split-main")
     };
-
-    const getVisibleItems = () => Array.from(track.children).filter((child) => child.offsetWidth > 0);
-
-    const hasOverflow = () => track.scrollWidth > toolbarGroup.clientWidth + 1;
-
-    const updateOverflowControls = () => {
-        const shouldShow = hasOverflow();
-        toolbarGroup.classList.toggle("toolbar-has-overflow", shouldShow);
-
-        if (!shouldShow && offsetX !== 0) {
-            offsetX = 0;
-            setTrackOffset();
-        }
-    };
-
-    const normalizeTrack = () => {
-        let items = getVisibleItems();
-        let guard = 0;
-
-        while (items.length > 1 && offsetX <= -items[0].offsetWidth && guard < items.length + 2) {
-            offsetX += items[0].offsetWidth;
-            track.appendChild(items[0]);
-            items = getVisibleItems();
-            guard += 1;
-        }
-
-        guard = 0;
-        while (items.length > 1 && offsetX > 0 && guard < items.length + 2) {
-            const lastItem = items[items.length - 1];
-            offsetX -= lastItem.offsetWidth;
-            track.insertBefore(lastItem, track.firstChild);
-            items = getVisibleItems();
-            guard += 1;
-        }
-
-        setTrackOffset();
-        updateOverflowControls();
-    };
-
-    const shiftToolbar = (direction) => {
-        const items = getVisibleItems();
-        if (items.length <= 1 || !hasOverflow()) return;
-
-        const firstWidth = items[0].offsetWidth || 32;
-        const lastWidth = items[items.length - 1].offsetWidth || firstWidth;
-        offsetX += direction === "right" ? -firstWidth : lastWidth;
-        normalizeTrack();
-    };
-
-    leftButton.addEventListener("click", (e) => {
-        e.stopPropagation();
-        shiftToolbar("left");
-    });
-
-    rightButton.addEventListener("click", (e) => {
-        e.stopPropagation();
-        shiftToolbar("right");
-    });
-
-    updateOverflowControls();
-    window.addEventListener("resize", updateOverflowControls);
-
-    if (window.ResizeObserver) {
-        const toolbarResizeObserver = new ResizeObserver(updateOverflowControls);
-        toolbarResizeObserver.observe(toolbarGroup);
-        toolbarResizeObserver.observe(track);
-    }
 }
 
-setupToolbarCarousel();
+function isInToolbarMenu(element) {
+    return Boolean(toolbarMenu?.contains(element));
+}
+
+function positionToolbarPanel(group) {
+    const { panel } = getToolbarGroupParts(group);
+    if (!panel) return;
+    if (isInToolbarMenu(group)) {
+        panel.style.left = "";
+        panel.style.top = "";
+        panel.style.maxHeight = "";
+        return;
+    }
+    const groupRect = group.getBoundingClientRect();
+    const top = groupRect.bottom + 4;
+    panel.style.maxHeight = `${Math.max(120, window.innerHeight - top - TOOLBAR_SCREEN_MARGIN)}px`;
+    const panelWidth = panel.getBoundingClientRect().width;
+    const left = Math.min(groupRect.left, window.innerWidth - panelWidth - TOOLBAR_SCREEN_MARGIN);
+    panel.style.left = `${Math.max(TOOLBAR_SCREEN_MARGIN, left)}px`;
+    panel.style.top = `${top}px`;
+}
+
+function setToolbarGroupOpen(group, open) {
+    const { button, panel } = getToolbarGroupParts(group);
+    if (!button || !panel) return;
+    panel.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+    group.classList.toggle("open", open);
+    if (open) positionToolbarPanel(group);
+}
+
+function closeToolbarGroups(except = null) {
+    toolbarGroups.forEach((group) => {
+        if (group !== except && !getToolbarGroupParts(group).panel?.hidden) setToolbarGroupOpen(group, false);
+    });
+}
+
+function positionToolbarMenu() {
+    if (!toolbarMenu || !toolbarMenuBtn || toolbarMenu.hidden) return;
+    const buttonRect = toolbarMenuBtn.getBoundingClientRect();
+    const top = buttonRect.bottom + 4;
+    toolbarMenu.style.top = `${top}px`;
+    toolbarMenu.style.right = `${Math.max(TOOLBAR_SCREEN_MARGIN, window.innerWidth - buttonRect.right)}px`;
+    toolbarMenu.style.maxHeight = `${Math.max(160, window.innerHeight - top - TOOLBAR_SCREEN_MARGIN)}px`;
+}
+
+function setToolbarMenuOpen(open) {
+    if (!toolbarMenu || !toolbarMenuBtn) return;
+    if (!open) toolbarGroups.filter(isInToolbarMenu).forEach((group) => setToolbarGroupOpen(group, false));
+    toolbarMenu.hidden = !open;
+    toolbarMenuBtn.setAttribute("aria-expanded", String(open));
+    const label = open ? "Menüyü kapat" : "Menüyü aç";
+    toolbarMenuBtn.title = label;
+    toolbarMenuBtn.setAttribute("aria-label", label);
+    const icon = toolbarMenuBtn.querySelector("svg");
+    if (icon) icon.innerHTML = open ? TOOLBAR_CLOSE_ICON : TOOLBAR_MENU_ICON;
+    toolbarMenuBtn.classList.toggle("active", open);
+    if (open) positionToolbarMenu();
+}
+
+function hasOpenToolbarPopup() {
+    return (toolbarMenu && !toolbarMenu.hidden) ||
+        toolbarGroups.some((group) => !getToolbarGroupParts(group).panel?.hidden);
+}
+
+function closeToolbarPopups() {
+    closeToolbarGroups();
+    setToolbarMenuOpen(false);
+}
+
+/** Satırı tek satırda tutar: sığmayan öğeler sondan başlayarak ☰ menüsüne geçer. */
+function fitToolbar() {
+    if (!toolbarRow || !toolbarOverflow || !toolbarMenu || !toolbarMenuBtn) return;
+    const placementBefore = toolbarItems.map(isInToolbarMenu).join();
+    toolbarMenuBtn.hidden = true;
+    toolbarItems.forEach((item) => toolbarOverflow.before(item));
+    const overflows = () => toolbarRow.scrollWidth > toolbarRow.clientWidth + 1;
+    if (overflows()) {
+        toolbarMenuBtn.hidden = false;
+        for (let index = toolbarItems.length - 1; index >= 0 && overflows(); index--) {
+            toolbarMenu.prepend(toolbarItems[index]);
+        }
+    }
+    if (toolbarItems.map(isInToolbarMenu).join() !== placementBefore) {
+        closeToolbarPopups();
+        return;
+    }
+    if (!toolbarMenuBtn.hidden) positionToolbarMenu();
+    else setToolbarMenuOpen(false);
+    toolbarGroups.forEach((group) => {
+        if (!getToolbarGroupParts(group).panel?.hidden) positionToolbarPanel(group);
+    });
+}
+
+function setToolbarSplitTarget(group, target) {
+    const { main } = getToolbarGroupParts(group);
+    if (!main || !target) return;
+    toolbarSplitTargets.set(group, target);
+    const icon = target.querySelector("img")?.getAttribute("src");
+    const mainIcon = main.querySelector("img");
+    if (icon && mainIcon) mainIcon.setAttribute("src", icon);
+    main.title = target.title;
+    main.setAttribute("aria-label", target.title);
+    main.disabled = target.disabled;
+    // Varsayılan seçenek (sola, dikey orta) her boş hücrede etkin olduğu için ana düğmeyi basılı göstermez.
+    main.classList.toggle("active", target.classList.contains("active") && !target.hasAttribute("data-tb-default"));
+}
+
+function setupToolbarPalette(section, applyColor, input) {
+    const grid = section?.querySelector(".tb-palette");
+    if (!section || !grid) return;
+    COLOR_PALETTE.forEach((color) => {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "tb-swatch";
+        swatch.dataset.color = color;
+        swatch.title = color;
+        swatch.setAttribute("aria-label", color);
+        swatch.style.backgroundColor = color;
+        grid.appendChild(swatch);
+    });
+    section.addEventListener("click", (e) => {
+        const button = e.target.closest("button");
+        if (!button || button.disabled) return;
+        if (button.dataset.color) {
+            applyColor(button.dataset.color);
+        } else if (button.hasAttribute("data-color-reset")) {
+            applyColor("");
+        } else if (button.hasAttribute("data-color-custom") && input) {
+            try {
+                if (typeof input.showPicker === "function") input.showPicker();
+                else input.click();
+            } catch {
+                input.click();
+            }
+        }
+    });
+}
+
+function markToolbarPalette(section, color) {
+    if (!section) return;
+    const active = /^#[0-9a-f]{6}$/i.test(color ?? "") ? color.toLowerCase() : "";
+    section.querySelectorAll(".tb-swatch").forEach((swatch) => {
+        swatch.classList.toggle("selected", swatch.dataset.color.toLowerCase() === active);
+    });
+    section.querySelector("[data-color-reset]")?.classList.toggle("selected", !active);
+}
+
+/** updateToolbarState'in grup kısmı: durum işaretleri, bölünmüş düğmeler, ipuçları, boş grupların kapanması. */
+function updateToolbarGroupState(style, canUseSelection, isRowSelection, isColumnSelection) {
+    const textGroup = document.querySelector('[data-tb-group="text"]');
+    if (textGroup) {
+        textGroup.querySelectorAll(".tb-color-section button").forEach((button) => {
+            button.disabled = !canUseSelection;
+        });
+        // Varsayılan yazı rengi "Otomatik" sayılır; boş hücre de bu rengi taşır.
+        const defaults = createDefaultCellStyle();
+        const isDefaultColor = (value) => !value || String(value).toLowerCase() === String(defaults.color).toLowerCase();
+        const textColor = isDefaultColor(style.color) ? "" : style.color;
+        markToolbarPalette(textGroup.querySelector('[data-tb-palette="text"]'), textColor);
+        markToolbarPalette(textGroup.querySelector('[data-tb-palette="fill"]'), style.backgroundColor);
+        const hasTextStyle = Boolean(style.bold || style.italic || style.underline || style.strikeThrough ||
+            textColor || style.backgroundColor || (style.fontSize && style.fontSize !== defaults.fontSize));
+        getToolbarGroupParts(textGroup).button?.classList.toggle("has-state", hasTextStyle);
+    }
+    document.querySelectorAll("[data-tb-border]").forEach((button) => {
+        button.disabled = !canUseSelection;
+    });
+    numberFormatMenu?.querySelectorAll("[data-number-format]").forEach((button) => {
+        button.disabled = !canUseSelection;
+    });
+    updateNumberFormatMenuState();
+    const filterLabel = filterBtn?.querySelector(".tb-label");
+    if (filterLabel) filterLabel.textContent = activeFilter ? "Filtreyi kaldır" : "Filtre oluştur";
+    document.querySelectorAll('[data-tb-hint="rows"]').forEach((hint) => { hint.hidden = isRowSelection; });
+    document.querySelectorAll('[data-tb-hint="cols"]').forEach((hint) => { hint.hidden = isColumnSelection; });
+
+    toolbarGroups.forEach((group) => {
+        const { button, panel } = getToolbarGroupParts(group);
+        if (!button || !panel) return;
+        if (group.classList.contains("tb-split")) {
+            setToolbarSplitTarget(group, toolbarSplitTargets.get(group) ?? panel.querySelector("button"));
+        }
+        if (group.hasAttribute("data-tb-keep-enabled")) return;
+        const actions = Array.from(panel.querySelectorAll("button"));
+        const disabled = actions.length > 0 && actions.every((action) => action.disabled);
+        button.disabled = disabled;
+        if (disabled && !panel.hidden) setToolbarGroupOpen(group, false);
+    });
+}
+
+function setupToolbarGroups() {
+    if (!toolbarRow || toolbarRow.dataset.groupsReady === "true") return;
+    toolbarRow.dataset.groupsReady = "true";
+
+    setupToolbarPalette(document.querySelector('[data-tb-palette="text"]'), setTextColor, textColorInput);
+    setupToolbarPalette(document.querySelector('[data-tb-palette="fill"]'), setFillColor, fillColorInput);
+
+    toolbarGroups.forEach((group) => {
+        const { button, panel, main } = getToolbarGroupParts(group);
+        if (!button || !panel) return;
+
+        button.addEventListener("click", () => {
+            const opening = panel.hidden;
+            closeToolbarGroups(group);
+            if (!isInToolbarMenu(group)) setToolbarMenuOpen(false);
+            hideZoomMenu();
+            hideColorPaletteMenus();
+            setToolbarGroupOpen(group, opening);
+        });
+
+        // Yakalama evresinde: düğmenin kendi işi (bazıları olayı durdurur) bundan sonra çalışır.
+        panel.addEventListener("click", (e) => {
+            const action = e.target.closest("button");
+            if (!action || action.disabled) return;
+            if (main && action.matches(".icon-btn")) setToolbarSplitTarget(group, action);
+            if (!group.hasAttribute("data-tb-stay-open")) closeToolbarPopups();
+        }, true);
+
+        if (main) {
+            setToolbarSplitTarget(group, panel.querySelector("button"));
+            main.addEventListener("click", () => {
+                const target = toolbarSplitTargets.get(group);
+                if (target && !target.disabled) target.click();
+            });
+        }
+    });
+
+    document.getElementById("border-group-panel")?.addEventListener("click", (e) => {
+        const button = e.target.closest("[data-tb-border]");
+        if (button && !button.disabled) applyBorderToSelection(button.dataset.tbBorder);
+    });
+
+    // ☰ menüsündeki tek düğmeler (Grafik, Birleştir…) işini yapınca menüyü kapatır. Grup başlıkları
+    // ve grupların içi kendi kuralına uyar; Yakınlaştırma kendi listesini açtığı için menüyü kapatmaz.
+    toolbarMenu?.addEventListener("click", (e) => {
+        const action = e.target.closest("button");
+        if (!action || action.disabled || action.closest(".tb-group") || action === zoomValueBtn) return;
+        setToolbarMenuOpen(false);
+    }, true);
+
+    toolbarMenuBtn?.addEventListener("click", () => {
+        const opening = Boolean(toolbarMenu?.hidden);
+        closeToolbarGroups();
+        hideZoomMenu();
+        setToolbarMenuOpen(opening);
+    });
+    setToolbarMenuOpen(false);
+
+    // Dışarıya dokununca kapanır. Yakalama evresinde, çünkü tablo kendi olaylarını durdurabilir.
+    document.addEventListener("pointerdown", (e) => {
+        const target = e.target;
+        if (!(target instanceof Node)) return;
+        if (toolbarMenu && !toolbarMenu.hidden && !toolbarMenu.contains(target) && !toolbarMenuBtn?.contains(target)) {
+            setToolbarMenuOpen(false);
+        }
+        toolbarGroups.forEach((group) => {
+            if (!getToolbarGroupParts(group).panel?.hidden && !group.contains(target)) setToolbarGroupOpen(group, false);
+        });
+    }, true);
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape" || !hasOpenToolbarPopup()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const openGroup = toolbarGroups.find((group) => !getToolbarGroupParts(group).panel?.hidden);
+        const focusTarget = openGroup && !isInToolbarMenu(openGroup) ? getToolbarGroupParts(openGroup).button : toolbarMenuBtn;
+        closeToolbarPopups();
+        if (focusTarget && !focusTarget.hidden) focusTarget.focus();
+    }, true);
+
+    fitToolbar();
+    if (window.ResizeObserver) new ResizeObserver(() => fitToolbar()).observe(toolbarRow);
+    else window.addEventListener("resize", fitToolbar);
+    document.fonts?.ready?.then(fitToolbar).catch(() => {});
+}
+
+setupToolbarGroups();
 // === EVENTS ===
 undoBtn.addEventListener("click", undo);
 redoBtn.addEventListener("click", redo);
@@ -5765,8 +5913,6 @@ redoBtn.addEventListener("click", redo);
 zoomValueBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
     hideFilterPopup();
     hideFileMenu();
     hideEditMenu();
@@ -5785,7 +5931,6 @@ zoomValueBtn?.addEventListener("click", (e) => {
 fileMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideEditMenu();
     hideViewMenu();
@@ -5838,7 +5983,6 @@ saveAsFileBtn?.addEventListener("click", async () => {
 editMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideFileMenu();
     hideViewMenu();
@@ -5902,7 +6046,6 @@ editMenu?.addEventListener("click", (e) => {
 viewMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideFileMenu();
     hideEditMenu();
@@ -5938,7 +6081,6 @@ menuViewGridlinesBtn?.addEventListener("click", () => {
 formatMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideFileMenu();
     hideEditMenu();
@@ -6039,7 +6181,6 @@ insertMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     const wasOpen = Boolean(insertMenu && !insertMenu.hidden);
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideFileMenu();
     hideEditMenu();
@@ -6077,7 +6218,6 @@ dataMenuBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     const wasOpen = Boolean(dataMenu && !dataMenu.hidden);
     hideContextMenu();
-    hideBorderMenu();
     hideFileMenu();
     hideEditMenu();
     hideViewMenu();
@@ -6140,33 +6280,28 @@ menuFilterBtn?.addEventListener("click", () => {
 
 sortAscBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     sortActiveRange("asc");
 });
 
 sortDescBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     sortActiveRange("desc");
 });
 
 filterBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     toggleFilterFromSelection();
 });
 
 hideAxisBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     hideSelectedRowsOrColumns();
 });
 
 showAxisBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     showHiddenRowsAndColumns();
 });
@@ -6180,7 +6315,6 @@ window.addEventListener("mouseup", () => {
 freezeAxisBtn?.addEventListener("click", () => {
     if (freezeAxisBtn.disabled) return;
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     toggleFreezeSelectedAxis();
 });
@@ -6189,16 +6323,13 @@ menuFreezeAxisBtn?.addEventListener("click", () => {
     if (menuFreezeAxisBtn.disabled) return;
     hideViewMenu();
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
     toggleFreezeSelectedAxis();
 });
 
 insertChartBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     hideFilterPopup();
-    hideNumberFormatMenu();
     insertChartFromSelection();
 });
 
@@ -6276,8 +6407,6 @@ function runFormatMenuAction(action) {
 
     if (action === "text-color" || action === "fill-color") {
         hideContextMenu();
-        hideBorderMenu();
-        hideNumberFormatMenu();
         showColorPaletteMenu(
             action === "text-color" ? textColorPaletteMenu : fillColorPaletteMenu,
             action === "text-color" ? menuTextColorBtn : menuFillColorBtn
@@ -6288,8 +6417,6 @@ function runFormatMenuAction(action) {
 
     hideFormatMenu();
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
 
     if (action === "bold") toggleStyleProperty("bold");
     if (action === "italic") toggleStyleProperty("italic");
@@ -6341,144 +6468,63 @@ formatMenu?.addEventListener("click", (e) => {
         e.stopPropagation();
         hideFormatMenu();
         hideContextMenu();
-        hideBorderMenu();
         applyBorderToSelection(borderButton.dataset.borderAction);
     }
 });
 
-borderBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    hideContextMenu();
-    hideNumberFormatMenu();
-    hideFileMenu();
-    hideEditMenu();
-    hideViewMenu();
-    hideFormatMenu();
-    if (borderMenu?.hidden) {
-        showBorderMenu();
-    } else {
-        hideBorderMenu();
-    }
-});
-
-borderMenu?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const button = e.target.closest("[data-border-action]");
-    if (!button) return;
-
-    applyBorderToSelection(button.dataset.borderAction);
-    hideBorderMenu();
-});
-
 mergeBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     toggleMergeSelection();
 });
 
 boldBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     toggleStyleProperty("bold");
 });
 
 italicBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     toggleStyleProperty("italic");
 });
 
 underlineBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     toggleStyleProperty("underline");
 });
 
 strikethroughBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     toggleStyleProperty("strikeThrough");
 });
 
 fontSizeDecreaseBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     changeFontSize(-1);
 });
 
 fontSizeIncreaseBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     changeFontSize(1);
-});
-
-textColorBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    hideContextMenu();
-    hideBorderMenu();
-    hideFileMenu();
-    hideEditMenu();
-    hideViewMenu();
-    hideInsertMenu();
-    hideDataMenu();
-    hideFormatMenu();
-    showColorPaletteMenu(textColorPaletteMenu, textColorBtn);
-});
-
-fillColorBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    hideContextMenu();
-    hideBorderMenu();
-    hideFileMenu();
-    hideEditMenu();
-    hideViewMenu();
-    hideInsertMenu();
-    hideDataMenu();
-    hideFormatMenu();
-    showColorPaletteMenu(fillColorPaletteMenu, fillColorBtn);
 });
 
 currencyFormatBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
     setNumberFormat("currency");
 });
 
 percentFormatBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
     setNumberFormat("percent");
 });
 
 decimalDecreaseBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
     changeDecimalPlaces(-1);
 });
 
 decimalIncreaseBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
-    hideNumberFormatMenu();
     changeDecimalPlaces(1);
-});
-
-numberFormatMoreBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (numberFormatMoreBtn.disabled) return;
-
-    hideContextMenu();
-    hideBorderMenu();
-    hideZoomMenu();
-    hideFilterPopup();
-    if (numberFormatMenu?.hidden) {
-        showNumberFormatMenu();
-    } else {
-        hideNumberFormatMenu();
-    }
 });
 
 numberFormatMenu?.addEventListener("click", (e) => {
@@ -6492,7 +6538,6 @@ numberFormatMenu?.addEventListener("click", (e) => {
         setNumberFormat(button.dataset.numberFormat);
     }
     updateNumberFormatMenuState();
-    hideNumberFormatMenu();
 });
 
 textColorInput?.addEventListener("input", () => {
@@ -6506,7 +6551,6 @@ fillColorInput?.addEventListener("input", () => {
 findToggleBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    hideBorderMenu();
     hideFileMenu();
     hideEditMenu();
     hideViewMenu();
@@ -6567,43 +6611,36 @@ findCloseBtn?.addEventListener("click", () => {
 
 alignLeftBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setHorizontalAlignment("left");
 });
 
 alignCenterBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setHorizontalAlignment("center");
 });
 
 alignRightBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setHorizontalAlignment("right");
 });
 
 alignJustifyBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setHorizontalAlignment("justify");
 });
 
 alignTopBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setVerticalAlignment("top");
 });
 
 alignMiddleBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setVerticalAlignment("middle");
 });
 
 alignBottomBtn?.addEventListener("click", () => {
     hideContextMenu();
-    hideBorderMenu();
     setVerticalAlignment("bottom");
 });
 
@@ -7131,13 +7168,8 @@ window.addEventListener("click", (e) => {
     if (contextMenu && !contextMenu.contains(e.target)) {
         hideContextMenu();
     }
-    if (borderMenu && !borderMenu.contains(e.target) && !borderBtn?.contains(e.target)) {
-        hideBorderMenu();
-    }
     if (
         !e.target.closest(".color-palette-menu") &&
-        !textColorBtn?.contains(e.target) &&
-        !fillColorBtn?.contains(e.target) &&
         !menuTextColorBtn?.contains(e.target) &&
         !menuFillColorBtn?.contains(e.target)
     ) {
@@ -7145,13 +7177,6 @@ window.addEventListener("click", (e) => {
     }
     if (zoomMenu && !zoomMenu.contains(e.target) && !zoomValueBtn?.contains(e.target)) {
         hideZoomMenu();
-    }
-    if (
-        numberFormatMenu &&
-        !numberFormatMenu.contains(e.target) &&
-        !numberFormatMoreBtn?.contains(e.target)
-    ) {
-        hideNumberFormatMenu();
     }
     if (
         chartSettingsTypeMenu &&
@@ -7212,11 +7237,9 @@ window.addEventListener("contextmenu", (e) => {
 });
 
 window.addEventListener("scroll", hideContextMenu, true);
-window.addEventListener("scroll", hideBorderMenu, true);
 window.addEventListener("scroll", hideColorPaletteMenus, true);
 window.addEventListener("scroll", hideFilterPopup, true);
 window.addEventListener("scroll", hideZoomMenu, true);
-window.addEventListener("scroll", hideNumberFormatMenu, true);
 window.addEventListener("scroll", hideChartTypeMenu, true);
 window.addEventListener("scroll", hideFileMenu, true);
 window.addEventListener("scroll", hideEditMenu, true);
@@ -7397,7 +7420,6 @@ window.addEventListener("keydown", (e) => {
             return;
         }
         hideContextMenu();
-        hideBorderMenu();
         hideFileMenu();
         hideEditMenu();
         hideViewMenu();

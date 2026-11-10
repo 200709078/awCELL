@@ -32,6 +32,9 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
 - **Geri al / yinele**: her sayfanın geçmişi ayrı tutulur.
 - **Otomatik kayıt**: tarayıcı deposunda. Sayfa yenilenince çalışma kendiliğinden gelir; sekme
   kapatılıp yeniden açılınca "Son çalışmanız bulundu — Geri yükle" önerilir.
+- **Araç çubuğu**: işler gruplu (Yazı, Hizalama, Kenarlık, Sayı biçimi, Satır, Sütun, Sırala ve süz,
+  Satır/sütun görünümü). Grup düğmesi tıklayınca açılır; Hizalama ve Kenarlık'ta düğmenin büyük kısmı
+  son seçimi tek dokunuşla uygular. Ekran darsa sığmayanlar ☰ menüsüne geçer (açıkken ✕).
 - **Yazdırma** (Ctrl+P): etkin sayfa A4'e bölünür; geniş tablolar yatay sayfaya geçer.
 
 ## Dosya biçimleri

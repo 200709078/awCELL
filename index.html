@@ -9,7 +9,7 @@
     <meta name="keywords" content="awCELL, elektronik tablo, tablolama, Excel, xlsx, ods">
     <meta name="author" content="mADEMatik Solutions">
     <meta name="theme-color" content="#188038">
-    <link rel="stylesheet" href="style.css?v=20261110b" type="text/css" />
+    <link rel="stylesheet" href="style.css?v=20261110c" type="text/css" />
     <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/app-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
@@ -390,154 +390,305 @@
             </section>
 
             <section id="control-panel" aria-label="Araç çubuğu">
-                <div class="toolbar-group">
-                    <div class="toolbar-cluster">
-                        <button id="undo-btn" class="icon-btn" title="Geri Al (Ctrl+Z)">
-                            <img src="icons/undo.svg" alt="" />
+                <!--
+                    Her .tb-item çubukta bir düğme ya da grup. Sığmayanlar sondan başlayarak ☰ menüsüne
+                    taşınır (app.js: setupToolbarGroups). .tb-name yalnız ☰ menüsünde görünür; .tb-label
+                    grup penceresinde her zaman görünür (anlamı simgeden çıkmayan düğmeler).
+                -->
+                <div id="toolbar-row" class="toolbar-group">
+                    <div class="tb-item tb-divider" data-tb-item="history">
+                        <button id="undo-btn" class="icon-btn" type="button" title="Geri Al (Ctrl+Z)">
+                            <img src="icons/undo.svg" alt="" /><span class="tb-name">Geri Al</span>
                         </button>
-                        <button id="redo-btn" class="icon-btn" title="Yinele (Ctrl+Y)">
-                            <img src="icons/redo.svg" alt="" />
-                        </button>
-                    </div>
-                    <div class="toolbar-cluster zoom-cluster">
-                        <button id="zoom-value-btn" class="zoom-value-btn" title="Yakınlaştırma seç">100%</button>
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="add-row-btn" class="icon-btn" title="Üste Satır Ekle">
-                            <img src="icons/addrowup.svg" alt="" />
-                        </button>
-                        <button id="add-row-down-btn" class="icon-btn" title="Alta Satır Ekle">
-                            <img src="icons/addrowdown.svg" alt="" />
-                        </button>
-                        <button id="remove-row-btn" class="icon-btn" title="Satır Sil">
-                            <img src="icons/delrow.svg" alt="" />
+                        <button id="redo-btn" class="icon-btn" type="button" title="Yinele (Ctrl+Y)">
+                            <img src="icons/redo.svg" alt="" /><span class="tb-name">Yinele</span>
                         </button>
                     </div>
-                    <div class="toolbar-cluster">
-                        <button id="add-col-btn" class="icon-btn" title="Sola Sütun Ekle">
-                            <img src="icons/addcolleft.svg" alt="" />
-                        </button>
-                        <button id="add-col-right-btn" class="icon-btn" title="Sağa Sütun Ekle">
-                            <img src="icons/addcolright.svg" alt="" />
-                        </button>
-                        <button id="remove-col-btn" class="icon-btn" title="Sütun Sil">
-                            <img src="icons/delcol.svg" alt="" />
+                    <div class="tb-item tb-divider" data-tb-item="zoom">
+                        <button id="zoom-value-btn" class="zoom-value-btn" type="button" title="Yakınlaştırma seç">
+                            <span class="tb-name">Yakınlaştırma</span><span id="zoom-value-text">100%</span>
                         </button>
                     </div>
-                    <div class="toolbar-cluster">
-                        <button id="insert-chart-btn" class="icon-btn" title="Grafik ekle">
-                            <img src="icons/addgraph.svg" alt="" />
+
+                    <div class="tb-item tb-group" data-tb-group="text" data-tb-stay-open>
+                        <button id="text-group-btn" class="icon-btn tb-group-btn" type="button" title="Yazı"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="text-group-panel">
+                            <img src="icons/text-group.svg" alt="" /><span class="tb-name">Yazı</span><span
+                                class="tb-caret" aria-hidden="true"></span>
                         </button>
+                        <div id="text-group-panel" class="tb-panel tb-panel-text" role="group" aria-label="Yazı" hidden>
+                            <div class="tb-row">
+                                <button id="bold-btn" class="icon-btn" type="button" title="Kalın (Ctrl+B)">
+                                    <img src="icons/text-bold.svg" alt="" />
+                                </button>
+                                <button id="italic-btn" class="icon-btn" type="button" title="İtalik (Ctrl+I)">
+                                    <img src="icons/text-italic.svg" alt="" />
+                                </button>
+                                <button id="underline-btn" class="icon-btn" type="button" title="Altı çizili (Ctrl+U)">
+                                    <img src="icons/text-underline.svg" alt="" />
+                                </button>
+                                <button id="strikethrough-btn" class="icon-btn" type="button" title="Üstü çizili">
+                                    <img src="icons/text-strikethrough.svg" alt="" />
+                                </button>
+                                <button id="font-size-decrease-btn" class="icon-btn" type="button" title="Yazıyı küçült">
+                                    <img src="icons/text-size-decrease.svg" alt="" />
+                                </button>
+                                <button id="font-size-increase-btn" class="icon-btn" type="button" title="Yazıyı büyüt">
+                                    <img src="icons/text-size-increase.svg" alt="" />
+                                </button>
+                            </div>
+                            <div class="tb-color-section" data-tb-palette="text">
+                                <div class="tb-color-head">
+                                    <span class="tb-color-title">Yazı rengi</span>
+                                    <button type="button" class="tb-color-action" data-color-reset>Otomatik</button>
+                                    <button type="button" class="tb-color-action" data-color-custom>Diğer renk…</button>
+                                </div>
+                                <div class="tb-palette"></div>
+                            </div>
+                            <div class="tb-color-section" data-tb-palette="fill">
+                                <div class="tb-color-head">
+                                    <span class="tb-color-title">Dolgu rengi</span>
+                                    <button type="button" class="tb-color-action" data-color-reset>Dolgu yok</button>
+                                    <button type="button" class="tb-color-action" data-color-custom>Diğer renk…</button>
+                                </div>
+                                <div class="tb-palette"></div>
+                            </div>
+                            <input id="text-color-input" class="hidden-color-input" type="color" value="#202124"
+                                aria-label="Yazı rengi" tabindex="-1" />
+                            <input id="fill-color-input" class="hidden-color-input" type="color" value="#fff2cc"
+                                aria-label="Dolgu rengi" tabindex="-1" />
+                        </div>
                     </div>
-                    <div class="toolbar-cluster">
-                        <button id="sort-asc-btn" class="icon-btn" title="A-Z Sırala">
-                            <img src="icons/sort-asc.svg" alt="" />
-                        </button>
-                        <button id="sort-desc-btn" class="icon-btn" title="Z-A Sırala">
-                            <img src="icons/sort-desc.svg" alt="" />
-                        </button>
-                        <button id="filter-btn" class="icon-btn" title="Filtre oluştur">
-                            <img src="icons/filter.svg" alt="" />
-                        </button>
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="hide-axis-btn" class="icon-btn" title="Seçili satırı/sütunu gizle">
-                            <img src="icons/eye-off.svg" alt="" />
-                        </button>
-                        <button id="show-axis-btn" class="icon-btn" title="Gizli satırları/sütunları göster">
-                            <img src="icons/eye.svg" alt="" />
-                        </button>
-                        <button id="freeze-axis-btn" class="icon-btn" title="Seçili satırı/sütunu dondur">
-                            <img src="icons/freeze-pane.svg" alt="" />
-                        </button>
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="border-btn" class="icon-btn" title="Kenarlıklar">
-                            <img src="icons/border-menu.svg" alt="" />
-                        </button>
-                        <button id="merge-btn" class="icon-btn" title="Hücreleri birleştir">
-                            <img src="icons/merge-cells.svg" alt="" />
-                        </button>
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="currency-format-btn" class="icon-btn" title="Para Birimi">
-                            <img src="icons/format-currency.svg" alt="" />
-                        </button>
-                        <button id="percent-format-btn" class="icon-btn" title="Yüzde">
-                            <img src="icons/format-percent.svg" alt="" />
-                        </button>
-                        <button id="decimal-decrease-btn" class="icon-btn" title="Ondalık basamak sayısını azalt">
-                            <img src="icons/decimal-decrease.svg" alt="" />
-                        </button>
-                        <button id="decimal-increase-btn" class="icon-btn" title="Ondalık basamak sayısını arttır">
-                            <img src="icons/decimal-increase.svg" alt="" />
-                        </button>
-                        <button id="number-format-more-btn" class="icon-btn" title="Diğer Biçimlendirmeler">
-                            <img src="icons/format-more.svg" alt="" />
-                        </button>
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="bold-btn" class="icon-btn" title="Kalın">
-                            <img src="icons/text-bold.svg" alt="" />
-                        </button>
-                        <button id="italic-btn" class="icon-btn" title="İtalik">
-                            <img src="icons/text-italic.svg" alt="" />
-                        </button>
-                        <button id="underline-btn" class="icon-btn" title="Altı çizili">
-                            <img src="icons/text-underline.svg" alt="" />
-                        </button>
-                        <button id="strikethrough-btn" class="icon-btn" title="Üstü çizili">
-                            <img src="icons/text-strikethrough.svg" alt="" />
-                        </button>
-                        <button id="font-size-decrease-btn" class="icon-btn" title="Yazı boyutunu azalt">
-                            <img src="icons/text-size-decrease.svg" alt="" />
-                        </button>
-                        <button id="font-size-increase-btn" class="icon-btn" title="Yazı boyutunu artır">
-                            <img src="icons/text-size-increase.svg" alt="" />
-                        </button>
-                        <button id="text-color-btn" class="icon-btn" title="Yazı rengi">
-                            <span class="text-color-icon-shell">
-                                <img src="icons/text-color.svg" alt="" />
-                                <span class="text-color-indicator-line"></span>
-                            </span>
-                        </button>
-                        <button id="fill-color-btn" class="icon-btn" title="Dolgu rengi">
-                            <span class="fill-color-icon-shell">
-                                <img src="icons/fill-color.svg" alt="" />
-                                <span class="fill-color-indicator-line"></span>
-                            </span>
-                        </button>
-                        <input id="text-color-input" class="hidden-color-input" type="color" value="#202124"
-                            aria-label="Yazı rengi" />
-                        <input id="fill-color-input" class="hidden-color-input" type="color" value="#fff2cc"
-                            aria-label="Dolgu rengi" />
-                    </div>
-                    <div class="toolbar-cluster">
-                        <button id="align-left-btn" class="icon-btn" title="Sola hizala">
+
+                    <div class="tb-item tb-group tb-split" data-tb-group="align">
+                        <button class="icon-btn tb-split-main" type="button" title="Sola hizala">
                             <img src="icons/align-left.svg" alt="" />
                         </button>
-                        <button id="align-center-btn" class="icon-btn" title="Ortaya hizala">
-                            <img src="icons/align-center.svg" alt="" />
+                        <button id="align-group-btn" class="icon-btn tb-group-btn" type="button" title="Hizalama"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="align-group-panel">
+                            <img class="tb-menu-only" src="icons/align-center.svg" alt="" /><span
+                                class="tb-name">Hizalama</span><span class="tb-caret" aria-hidden="true"></span>
                         </button>
-                        <button id="align-right-btn" class="icon-btn" title="Sağa hizala">
-                            <img src="icons/align-right.svg" alt="" />
+                        <div id="align-group-panel" class="tb-panel" role="group" aria-label="Hizalama" hidden>
+                            <div class="tb-row">
+                                <button id="align-left-btn" class="icon-btn" type="button" data-tb-default title="Sola hizala">
+                                    <img src="icons/align-left.svg" alt="" />
+                                </button>
+                                <button id="align-center-btn" class="icon-btn" type="button" title="Ortaya hizala">
+                                    <img src="icons/align-center.svg" alt="" />
+                                </button>
+                                <button id="align-right-btn" class="icon-btn" type="button" title="Sağa hizala">
+                                    <img src="icons/align-right.svg" alt="" />
+                                </button>
+                                <button id="align-justify-btn" class="icon-btn" type="button" title="İki yana yasla">
+                                    <img src="icons/align-justify.svg" alt="" />
+                                </button>
+                            </div>
+                            <div class="tb-row">
+                                <button id="align-top-btn" class="icon-btn" type="button" title="Üste hizala">
+                                    <img src="icons/align-top.svg" alt="" />
+                                </button>
+                                <button id="align-middle-btn" class="icon-btn" type="button" data-tb-default title="Dikey ortala">
+                                    <img src="icons/align-middle.svg" alt="" />
+                                </button>
+                                <button id="align-bottom-btn" class="icon-btn" type="button" title="Alta hizala">
+                                    <img src="icons/align-bottom.svg" alt="" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tb-item tb-group tb-split" data-tb-group="border">
+                        <button class="icon-btn tb-split-main" type="button" title="Tüm kenarlıklar">
+                            <img src="icons/border-all.svg" alt="" />
                         </button>
-                        <button id="align-justify-btn" class="icon-btn" title="İki yana yasla">
-                            <img src="icons/align-justify.svg" alt="" />
+                        <button id="border-group-btn" class="icon-btn tb-group-btn" type="button" title="Kenarlık"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="border-group-panel">
+                            <img class="tb-menu-only" src="icons/border-menu.svg" alt="" /><span
+                                class="tb-name">Kenarlık</span><span class="tb-caret" aria-hidden="true"></span>
+                        </button>
+                        <div id="border-group-panel" class="tb-panel" role="group" aria-label="Kenarlık" hidden>
+                            <div class="tb-row">
+                                <button class="icon-btn" type="button" data-tb-border="all" title="Tüm kenarlıklar">
+                                    <img src="icons/border-all.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="outer" title="Dış kenarlık">
+                                    <img src="icons/border-outer.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="inner" title="İç kenarlık">
+                                    <img src="icons/border-inner.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="clear" title="Kenarlıkları temizle">
+                                    <img src="icons/border-clear.svg" alt="" />
+                                </button>
+                            </div>
+                            <div class="tb-row">
+                                <button class="icon-btn" type="button" data-tb-border="top" title="Üst kenarlık">
+                                    <img src="icons/border-top.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="bottom" title="Alt kenarlık">
+                                    <img src="icons/border-bottom.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="left" title="Sol kenarlık">
+                                    <img src="icons/border-left.svg" alt="" />
+                                </button>
+                                <button class="icon-btn" type="button" data-tb-border="right" title="Sağ kenarlık">
+                                    <img src="icons/border-right.svg" alt="" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tb-item" data-tb-item="merge">
+                        <button id="merge-btn" class="icon-btn" type="button" title="Hücreleri birleştir">
+                            <img src="icons/merge-cells.svg" alt="" /><span class="tb-name">Hücreleri birleştir</span>
                         </button>
                     </div>
-                    <div class="toolbar-cluster">
-                        <button id="align-top-btn" class="icon-btn" title="Üste hizala">
-                            <img src="icons/align-top.svg" alt="" />
+
+                    <div class="tb-item tb-group tb-divider" data-tb-group="number">
+                        <button id="number-group-btn" class="icon-btn tb-group-btn" type="button" title="Sayı biçimi"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="number-group-panel">
+                            <img src="icons/format-more.svg" alt="" /><span class="tb-name">Sayı biçimi</span><span
+                                class="tb-caret" aria-hidden="true"></span>
                         </button>
-                        <button id="align-middle-btn" class="icon-btn" title="Dikey ortala">
-                            <img src="icons/align-middle.svg" alt="" />
+                        <div id="number-group-panel" class="tb-panel" role="group" aria-label="Sayı biçimi" hidden>
+                            <button id="currency-format-btn" class="icon-btn tb-labeled" type="button" title="Para birimi">
+                                <img src="icons/format-currency.svg" alt="" /><span class="tb-label">Para birimi</span>
+                            </button>
+                            <button id="percent-format-btn" class="icon-btn tb-labeled" type="button" title="Yüzde">
+                                <img src="icons/format-percent.svg" alt="" /><span class="tb-label">Yüzde</span>
+                            </button>
+                            <button id="decimal-decrease-btn" class="icon-btn tb-labeled" type="button"
+                                title="Ondalık basamağı azalt">
+                                <img src="icons/decimal-decrease.svg" alt="" /><span class="tb-label">Ondalık azalt</span>
+                            </button>
+                            <button id="decimal-increase-btn" class="icon-btn tb-labeled" type="button"
+                                title="Ondalık basamağı artır">
+                                <img src="icons/decimal-increase.svg" alt="" /><span class="tb-label">Ondalık artır</span>
+                            </button>
+                            <hr />
+                            <div id="number-format-menu" class="tb-format-list">
+                                <button type="button" data-number-format="automatic">
+                                    <span class="menu-check" aria-hidden="true">✓</span>
+                                    <span>Düz metin</span>
+                                </button>
+                                <button type="button" data-number-format="number">
+                                    <span class="menu-check" aria-hidden="true">✓</span>
+                                    <span>Sayı</span>
+                                    <span class="number-format-example">123,00</span>
+                                </button>
+                                <button type="button" data-number-format="date">
+                                    <span class="menu-check" aria-hidden="true">✓</span>
+                                    <span>Tarih</span>
+                                    <span class="number-format-example">01.01.1900</span>
+                                </button>
+                                <button type="button" data-number-format="time">
+                                    <span class="menu-check" aria-hidden="true">✓</span>
+                                    <span>Saat</span>
+                                    <span class="number-format-example">19:59:00</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tb-item tb-group" data-tb-group="rows" data-tb-keep-enabled>
+                        <button id="rows-group-btn" class="icon-btn tb-group-btn" type="button" title="Satır"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="rows-group-panel">
+                            <img src="icons/rows.svg" alt="" /><span class="tb-name">Satır</span><span
+                                class="tb-caret" aria-hidden="true"></span>
                         </button>
-                        <button id="align-bottom-btn" class="icon-btn" title="Alta hizala">
-                            <img src="icons/align-bottom.svg" alt="" />
+                        <div id="rows-group-panel" class="tb-panel" role="group" aria-label="Satır" hidden>
+                            <p class="tb-hint" data-tb-hint="rows">Önce satır numarasına dokunun.</p>
+                            <button id="add-row-btn" class="icon-btn tb-labeled" type="button" title="Üste satır ekle">
+                                <img src="icons/addrowup.svg" alt="" /><span class="tb-label">Üste satır ekle</span>
+                            </button>
+                            <button id="add-row-down-btn" class="icon-btn tb-labeled" type="button" title="Alta satır ekle">
+                                <img src="icons/addrowdown.svg" alt="" /><span class="tb-label">Alta satır ekle</span>
+                            </button>
+                            <button id="remove-row-btn" class="icon-btn tb-labeled" type="button" title="Satır sil">
+                                <img src="icons/delrow.svg" alt="" /><span class="tb-label">Satırı sil</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tb-item tb-group" data-tb-group="cols" data-tb-keep-enabled>
+                        <button id="cols-group-btn" class="icon-btn tb-group-btn" type="button" title="Sütun"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="cols-group-panel">
+                            <img src="icons/cols.svg" alt="" /><span class="tb-name">Sütun</span><span
+                                class="tb-caret" aria-hidden="true"></span>
+                        </button>
+                        <div id="cols-group-panel" class="tb-panel" role="group" aria-label="Sütun" hidden>
+                            <p class="tb-hint" data-tb-hint="cols">Önce sütun harfine dokunun.</p>
+                            <button id="add-col-btn" class="icon-btn tb-labeled" type="button" title="Sola sütun ekle">
+                                <img src="icons/addcolleft.svg" alt="" /><span class="tb-label">Sola sütun ekle</span>
+                            </button>
+                            <button id="add-col-right-btn" class="icon-btn tb-labeled" type="button" title="Sağa sütun ekle">
+                                <img src="icons/addcolright.svg" alt="" /><span class="tb-label">Sağa sütun ekle</span>
+                            </button>
+                            <button id="remove-col-btn" class="icon-btn tb-labeled" type="button" title="Sütun sil">
+                                <img src="icons/delcol.svg" alt="" /><span class="tb-label">Sütunu sil</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tb-item tb-group" data-tb-group="sort">
+                        <button id="sort-group-btn" class="icon-btn tb-group-btn" type="button" title="Sırala ve süz"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="sort-group-panel">
+                            <img src="icons/sort-filter.svg" alt="" /><span class="tb-name">Sırala ve süz</span><span
+                                class="tb-caret" aria-hidden="true"></span>
+                        </button>
+                        <div id="sort-group-panel" class="tb-panel" role="group" aria-label="Sırala ve süz" hidden>
+                            <button id="sort-asc-btn" class="icon-btn tb-labeled" type="button" title="A'dan Z'ye sırala">
+                                <img src="icons/sort-asc.svg" alt="" /><span class="tb-label">A'dan Z'ye sırala</span>
+                            </button>
+                            <button id="sort-desc-btn" class="icon-btn tb-labeled" type="button" title="Z'den A'ya sırala">
+                                <img src="icons/sort-desc.svg" alt="" /><span class="tb-label">Z'den A'ya sırala</span>
+                            </button>
+                            <button id="filter-btn" class="icon-btn tb-labeled" type="button" title="Filtre oluştur">
+                                <img src="icons/filter.svg" alt="" /><span class="tb-label">Filtre oluştur</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tb-item tb-group" data-tb-group="axis">
+                        <button id="axis-group-btn" class="icon-btn tb-group-btn" type="button"
+                            title="Satır ve sütun görünümü" aria-haspopup="true" aria-expanded="false"
+                            aria-controls="axis-group-panel">
+                            <img src="icons/eye.svg" alt="" /><span class="tb-name">Satır/sütun görünümü</span><span
+                                class="tb-caret" aria-hidden="true"></span>
+                        </button>
+                        <div id="axis-group-panel" class="tb-panel" role="group" aria-label="Satır ve sütun görünümü"
+                            hidden>
+                            <button id="hide-axis-btn" class="icon-btn tb-labeled" type="button"
+                                title="Seçili satırı/sütunu gizle">
+                                <img src="icons/eye-off.svg" alt="" /><span class="tb-label">Gizle</span>
+                            </button>
+                            <button id="show-axis-btn" class="icon-btn tb-labeled" type="button"
+                                title="Gizli satırları/sütunları göster">
+                                <img src="icons/eye.svg" alt="" /><span class="tb-label">Gizlileri göster</span>
+                            </button>
+                            <button id="freeze-axis-btn" class="icon-btn tb-labeled" type="button"
+                                title="Seçili satırı/sütunu dondur">
+                                <img src="icons/freeze-pane.svg" alt="" /><span class="tb-label">Dondur</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tb-item" data-tb-item="chart">
+                        <button id="insert-chart-btn" class="icon-btn" type="button" title="Grafik ekle">
+                            <img src="icons/addgraph.svg" alt="" /><span class="tb-name">Grafik ekle</span>
+                        </button>
+                    </div>
+
+                    <div class="tb-overflow">
+                        <button id="toolbar-menu-btn" class="icon-btn" type="button" title="Menüyü aç"
+                            aria-label="Menüyü aç" aria-haspopup="true" aria-expanded="false"
+                            aria-controls="toolbar-menu" hidden>
+                            <svg class="tb-menu-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
                         </button>
                     </div>
                 </div>
+                <div id="toolbar-menu" class="tb-menu" role="group" aria-label="Diğer araçlar" hidden></div>
             </section>
         </header>
 
@@ -765,55 +916,6 @@
         </button>
     </div>
 
-    <div id="border-menu" class="toolbar-menu" hidden>
-        <button type="button" data-border-action="all" title="Tüm kenarlıklar">
-            <img src="icons/border-all.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="outer" title="Dış kenarlık">
-            <img src="icons/border-outer.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="inner" title="İç kenarlık">
-            <img src="icons/border-inner.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="top" title="Üst kenarlık">
-            <img src="icons/border-top.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="bottom" title="Alt kenarlık">
-            <img src="icons/border-bottom.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="left" title="Sol kenarlık">
-            <img src="icons/border-left.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="right" title="Sağ kenarlık">
-            <img src="icons/border-right.svg" alt="" />
-        </button>
-        <button type="button" data-border-action="clear" title="Kenarlıkları temizle">
-            <img src="icons/border-clear.svg" alt="" />
-        </button>
-    </div>
-
-    <div id="number-format-menu" class="number-format-menu" hidden>
-        <button type="button" data-number-format="automatic">
-            <span class="menu-check" aria-hidden="true">✓</span>
-            <span>Düz Metin</span>
-        </button>
-        <button type="button" data-number-format="number">
-            <span class="menu-check" aria-hidden="true">✓</span>
-            <span>Sayı</span>
-            <span class="number-format-example">123.00</span>
-        </button>
-        <button type="button" data-number-format="date">
-            <span class="menu-check" aria-hidden="true">✓</span>
-            <span>Tarih</span>
-            <span class="number-format-example">01.01.1900</span>
-        </button>
-        <button type="button" data-number-format="time">
-            <span class="menu-check" aria-hidden="true">✓</span>
-            <span>Saat</span>
-            <span class="number-format-example">19:59:00</span>
-        </button>
-    </div>
-
     <div id="zoom-menu" class="zoom-menu" hidden>
         <button type="button" data-zoom-value="50">50%</button>
         <button type="button" data-zoom-value="75">75%</button>
@@ -834,9 +936,9 @@
     </div>
 
     <script src="vendor/chart.js"></script>
-    <script src="formula.js?v=20261110b"></script>
-    <script src="fileio.js?v=20261110b"></script>
-    <script src="app.js?v=20261110b"></script>
+    <script src="formula.js?v=20261110c"></script>
+    <script src="fileio.js?v=20261110c"></script>
+    <script src="app.js?v=20261110c"></script>
     <script>
         if ("serviceWorker" in navigator && location.protocol === "https:") {
             navigator.serviceWorker.register("sw.js").catch(() => {});
