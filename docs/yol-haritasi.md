@@ -146,7 +146,7 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    **Hazırlandı (2026-11-10):** `public/gizlilik.html` (canlıda madematik.com/awCELL/gizlilik.html),
    `docs/play/magaza.md` (ad, kısa ve tam açıklama, kategori, beyan önerileri, 1.1.0 sürüm notu; `node
    scripts/play/sinirlar.mjs` sınırları denetler), `docs/play/` simge, öne çıkan görsel ve telefon / 7" / 10" tablet
-   ekran görüntüleri (`npm run play:gorseller`; uydurma not çizelgesi). İmzalı AAB: v1.1.0 iş akışının
+   ekran görüntüleri (`npm run play:gorseller`; uydurma not çizelgesi). İmzalı AAB: son sürüm iş akışının
    `play-Android` artifact'ı (yerelde `release/awCELL-android.aab`, depoya girmez).
    Görsellerde bulunan hata düzeltildi: yeni grafik penceresi dar ekranda taşıyor, kaydırılmış tabloda görünmeyen
    yere açılıyordu.

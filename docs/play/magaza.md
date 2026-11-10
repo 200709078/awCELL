@@ -69,11 +69,11 @@ awCELL ücretsizdir. Öneri ve sorunlar için: destek@madematik.com
 
 Play Console'da sürüm oluşturulurken `<tr-TR>` ile `</tr-TR>` arasına yazılır. En yenisi üstte.
 
-### 1.1.0
+### 1.1.1
 
-<!-- not-1.1.0 -->
+<!-- not-1.1.1 -->
 İlk sürüm. Türkçe formüllü elektronik tablo: Excel ve LibreOffice dosyalarını açar ve kaydeder, grafik çizer, PDF olarak kaydeder ve yazdırır. Dokunmatik için tasarlandı; binlerce satırlık tablolarda bile hızlıdır. Reklam yok, hiçbir veri toplanmaz.
-<!-- /not-1.1.0 -->
+<!-- /not-1.1.1 -->
 
 ## Görseller (`docs/play/`)
 
