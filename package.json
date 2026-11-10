@@ -58,14 +58,37 @@
           "Name": "awCELL",
           "Comment": "Elektronik tablo"
         }
-      }
+      },
+      "fileAssociations": [
+        {
+          "ext": "awc",
+          "name": "awCELL.Workbook",
+          "description": "awCELL tablosu",
+          "mimeType": "application/x-awcell",
+          "role": "Editor"
+        }
+      ],
+      "mimeTypes": [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "text/csv"
+      ]
     },
     "deb": {
       "packageCategory": "education"
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "awc",
+          "name": "awCELL.Workbook",
+          "description": "awCELL tablosu",
+          "mimeType": "application/x-awcell",
+          "role": "Editor"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,

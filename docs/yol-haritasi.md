@@ -105,6 +105,17 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    **Ertelendi:** `capacitor.config.json` ve `android/` 4. adıma kaldı: `release.yml`, `android/` klasörü
    görünce APK'yı da yayımlıyor; dosya kaydetme Android'e uyarlanmadan yarım bir APK çıkmasın.
 2. **Masaüstü paketleri:** .deb, AppImage, .exe; GitHub Releases, sürüm numarasız adlar.
+   **Yapıldı (2026-11-10), sürüm bekliyor:** kendi başlık çubuğu (kullanıcı isteği; drAW ailesi ve awPDF ile aynı
+   görünüm, açık dosyanın adını gösterir), çerçevesiz pencere. Dosya pencereleri Electron'dan (`electron/files.js`):
+   sayfa yolu hiç görmez, yalnız kullanıcının seçtiği dosyaya numarayla okur/yazar; `src/desktop.js` tarayıcının
+   dosya erişim arayüzünü bunlarla sağlar, uygulamanın açma/kaydetme kodu tek kaldı. Ctrl+S açık `.awc`'nin
+   üstüne yazar. Masaüstünde "Farklı kaydet" önce biçimi sorar (sistem penceresi seçilen filtreyi bildirmez).
+   "Birlikte aç": Linux'ta `.awc` kendi türü (`application/x-awcell`), `.xlsx`/`.ods`/`.csv` yalnız "Birlikte aç"
+   listesinde (sistem türlerinin tanımı değişmez); Windows'ta yalnız `.awc` (kurulum ilişkilendirdiği uzantının
+   varsayılanı olur). İkinci açılış dosyayı var olan pencereye verir. GitHub Actions'ta yalnız paket üreten
+   çalıştırmada Linux ve Windows paketleri üretildi (2026-11-10). Denendi: Electron'da ve paketlenmiş Linux
+   uygulamasında (pencere gizli; sistem dosya pencereleri betikle yanıtlandı). Denenmedi: yazdırma (sistem
+   penceresi), gerçek kurulum (.deb, .exe), Windows'ta çalıştırma.
 3. **Dokunmatik uyarlama:** tablo fare olaylarıyla çalışıyor; telefonda ve tahtada sürükleyerek aralık seçme,
    sütun/satır boyutlandırma, doldurma tutamacı ve sağ tık menüsü (uzun basma) çalışmıyor. Bugün web
    sürümünde tahtada da geçerli.
@@ -112,6 +123,12 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    paylaşma eklentisi), yazdırma, "Birlikte aç".
 5. **Play Store:** imzalı .aab (`play-Android` artifact'ı), gizlilik politikası (awPDF `gizlilik.html` örnek),
    mağaza simgesi ve ekran görüntüleri.
+
+**Kullanıcı kararı (2026-11-10):** APK de GitHub sürümünde, kardeşlerle aynı imzayla yayımlanır; bütün
+paketler (deb, AppImage, exe, apk) GitHub sürümünde. Sürüm 1.0.0'dan başlar (yalnız awCELL), gerekli
+değişiklikler (Android uyarlaması) bittikten sonra. İmza: `ANDROID_KEYSTORE_BASE64` ve `ANDROID_KEY_ALIAS`
+secret'ları Claude yükleyebilir; iki parola (`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`) kullanıcı
+tarafından `gh secret set` ile girilir.
 
 **Ayrıntılar ve açık sorular:**
 - "Birlikte aç": `.awc` awCELL'in kendi dosyası. `.xlsx`, `.ods`, `.csv` yalnız "Birlikte aç" listesine girsin,

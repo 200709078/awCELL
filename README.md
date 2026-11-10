@@ -90,6 +90,10 @@ npm run icons       # simgeleri public/icons/app-icon.svg'den yeniden üretir (I
 
 ## Masaüstü paketleri
 
+Masaüstü uygulamasının kendi başlık çubuğu vardır (drAW ailesi ve awPDF gibi). Dosya pencereleri sistemin
+pencereleridir; Ctrl+S açık `.awc` dosyasının üstüne yazar. Dosya yöneticisinde `.awc` çift tıklamayla,
+`.xlsx`, `.ods`, `.csv` "Birlikte aç" ile awCELL'de açılır (Windows'ta yalnız `.awc` ilişkilendirilir).
+
 Linux `.deb` ve AppImage, Windows `.exe`; drAW ailesi ve awPDF ile aynı iş akışıyla
 (`.github/workflows/release.yml`, `scripts/release-assets.mjs`; ikisi beş depoda birebir aynı) yalnız
 GitHub Releases'te, sürüm numarası olmayan adlarla yayımlanır. Sürüm: `npm version patch`, ardından etiket
@@ -123,9 +127,10 @@ awCELL/
 │   ├── app.js            # Arayüz: tablo çizimi, seçim, düzenleme, sayfalar, grafikler (Chart.js)
 │   ├── formula.js        # Formül motoru (belirteç → ayrıştırıcı → değerlendirici), başvuru dönüşümleri
 │   ├── fileio.js         # ZIP, XLSX, ODS, XLS (2003 XML), CSV, PDF; yazdırma sayfaları
+│   ├── desktop.js        # Masaüstü: başlık çubuğu, dosya pencereleri, "Birlikte aç"
 │   └── style.css         # Tema ve yerleşim
 ├── public/               # Olduğu gibi kopyalanır: icons/, sw.js, manifest.webmanifest
-├── electron/main.js      # Masaüstü uygulaması (Electron ana süreci)
+├── electron/             # Masaüstü: main.js (pencere), files.js (dosya pencereleri), preload.cjs
 ├── build/                # Paket simgeleri (icons/, icon.ico; npm run icons üretir)
 ├── tests/                # node --test testleri
 ├── docs/yol-haritasi.md  # İstekler ve planlar

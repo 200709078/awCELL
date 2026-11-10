@@ -7,6 +7,7 @@
 import Chart from "chart.js/auto";
 import AwFileIO from "./fileio.js";
 import AwFormula from "./formula.js";
+import { isDesktopApp, setupDesktop } from "./desktop.js";
 // Butonlar sığmazsa alt satıra geçilsin.
 
 const table = document.getElementById("data-table");
@@ -4706,11 +4707,32 @@ async function writeSaveFile(blob, fileName, types = [AWC_FILE_TYPE]) {
     };
 }
 
+/** Masaüstünde önce biçim sorulur: sistemin kaydetme penceresi seçilen filtreyi bildirmez. */
+async function askDesktopSaveFormat() {
+    const result = await showAppDialog({
+        title: "Farklı kaydet",
+        message: "Biçim:",
+        select: { options: SAVE_FORMATS, value: "awc" },
+        confirmText: "Devam",
+        cancelText: "Vazgeç"
+    });
+    if (!result.confirmed) return null;
+    const type = SAVE_AS_FILE_TYPES.find((item) => Object.values(item.accept).flat().includes(`.${result.selected}`));
+    return type ? { extension: result.selected, types: [type] } : null;
+}
+
 async function writeSaveAsFile(defaultName) {
     if ("showSaveFilePicker" in window) {
+        let extension = "awc";
+        let types = SAVE_AS_FILE_TYPES;
+        if (isDesktopApp()) {
+            const format = await askDesktopSaveFormat();
+            if (!format) return false;
+            ({ extension, types } = format);
+        }
         const handle = await window.showSaveFilePicker({
-            suggestedName: `${defaultName}.awc`,
-            types: SAVE_AS_FILE_TYPES
+            suggestedName: `${defaultName}.${extension}`,
+            types
         });
         let fileName = handle.name || `${defaultName}.awc`;
         if (!getFileExtension(fileName)) fileName = `${fileName}.awc`;
@@ -9336,6 +9358,18 @@ function resizeChartWindow(e) {
     chart.element.style.height = `${height}px`;
     chart.instance?.resize();
 }
+
+// Masaüstünde başlık çubuğu, dosya pencereleri ve "Birlikte aç" (src/desktop.js).
+setupDesktop({
+    openFile: async (file, handle) => {
+        if (isEditing) exitEditMode(true);
+        try {
+            await openWorkbookFile(file, handle);
+        } catch (error) {
+            showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
+        }
+    }
+});
 
 // Çevrimdışı çalışma yalnız web sürümünde; Electron ve Android paketleri dosyaları zaten içinde taşır.
 if ("serviceWorker" in navigator && location.protocol === "https:" && !window.Capacitor) {
