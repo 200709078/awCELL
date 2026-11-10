@@ -21,6 +21,8 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
 - **Hatalar** Türkçe Excel'deki gibi gösterilir: `#SAYI/0!`, `#DEĞER!`, `#AD?`, `#BAŞV!`, `#YOK`;
   döngüsel başvuru uygulamayı kilitlemez, `#DÖNGÜ!` olur.
 - **Ondalık**: `3,5` ve `3.5` ikisi de sayıdır; formül sonuçları virgülle gösterilir.
+- **Büyük tablolar**: yeni sayfa 200 satır × 52 sütun (A–AZ); kaydırarak sona yaklaşınca kendiliğinden büyür
+  (en çok 5000 satır, 200 sütun). Uzun tablolarda yalnız ekrandaki satırlar çizilir; kaydırma hızlı kalır.
 - **Satır / sütun**: ekleme, silme, gizleme, taşıma, dondurma; ekleme/silmede formüller ve grafik
   aralıkları (diğer sayfalardakiler dahil) güncellenir.
 - **Hücre biçimi**: kalın, italik, altı/üstü çizili, yazı rengi ve boyutu, dolgu, hizalama, kenarlık,

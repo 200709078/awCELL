@@ -163,7 +163,7 @@ Web sürümü aynı gün canlıda. Sıradaki: 5. adım (Play Store) ve "Daha ço
 - Tahtada çok yazı yazılacağı için awPDF / drAW'daki ekran klavyesi awCELL'e de alınmalı.
 - Play sırası (awPDF → drAW → drAW2D → drAW3D) içinde awCELL'in yeri kullanıcıya sorulacak.
 
-## Daha çok satır ve sütun (2026-11-10, kullanıcı isteği; kodlanmadı)
+## Daha çok satır ve sütun (2026-11-10, kullanıcı isteği)
 
 Kullanıcı: varsayılan 100 satır; mümkün olduğunca satır ve sütun sayısı artırılsın.
 
@@ -173,3 +173,16 @@ Kullanıcı: varsayılan 100 satır; mümkün olduğunca satır ve sütun sayıs
 - **Seçenek 2 (büyük, öneri):** yalnız görünen hücreleri çizmek (sanal kaydırma). 10.000 × 200 bile hızlı olur; çizim,
   birleştirme, dondurma, seçim ve satır yükseklikleri yeniden yazılır, kapsamlı test gerekir.
 - Önerilen sıra: Android ve v1.0.0 şimdiki sayılarla; ardından seçenek 2 ayrı adım. Karar kullanıcıda.
+- Ölçüm (2026-11-10): asıl darboğaz bellek — her boş hücre ayrı nesne (biçim ve kenarlık nesneleriyle) ve geri alma
+  her işlemde bütün tablonun kopyasını saklar (60 adım). Aşamalar: (1) varsayılan 200 × 52, kaydırdıkça büyüme,
+  geri alma kopyalarında boş hücreler saklanmaz; (2) yalnız görünen satırları çizmek; (3) seyrek veri ve farkla
+  geri alma (100.000+ satır).
+- **Kullanıcı kararı (2026-11-10):** 1 ve 2 yeterli; ardından Play Store.
+- **1 ve 2 yapıldı (2026-11-10):** varsayılan 200 × 52 (A–AZ); kaydırarak sona yaklaşınca 100 satır / 26 sütun eklenir
+  (en çok 5000 satır, 200 sütun, 300.000 hücre). Geri alma kopyalarında boş hücreler saklanmaz. 300 satırı geçen
+  tabloda yalnız ekrandaki satırlar ve 30'ar satır pay çizilir (20'lik dilimler; aradaki satırların yerini aynı
+  yükseklikte boş satır tutar); dondurulmuş satırlar hep çizilir, pencere kenarındaki birleştirmeler bütünüyle
+  içeride kalır; uzak hücreye gidince (ok tuşları, Ad kutusu, Bul, düzenleme) önce oraya kaydırılır; düzenleme
+  sürerken kaydırma yeniden çizmez. 3000 satırda kaydırma başına çizim ~13 ms (masaüstü). Denendi: 3000 satırlık CSV
+  ile fare, klavye, Ad kutusu, geri alma, tümünü seç, dondurma, birleştirme ve dokunma taklidi. Bu sırada eskiden
+  beri olan bir hata düzeltildi: Ad kutusuna "C5" yazıp Enter'a basınca C6 seçiliyordu.

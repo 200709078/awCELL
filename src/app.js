@@ -197,8 +197,24 @@ const SAVE_AS_FILE_TYPES = [
         accept: { "text/csv": [".csv"] }
     }
 ];
-let rowCount = 100;
-let colCount = 26;
+// Tablo boyutu: varsayılan 200 × 52 (A–AZ); kaydırarak sona yaklaşınca kendiliğinden büyür.
+const DEFAULT_GRID_ROWS = 200;
+const DEFAULT_GRID_COLS = 52;
+const GRID_GROW_ROWS = 100;
+const GRID_GROW_COLS = 26;
+const MAX_GRID_ROWS = 5000;
+const MAX_GRID_COLS = 200;
+// Her boş hücre de bellekte bir nesne: kendiliğinden büyüme bu kadar hücrede durur.
+const MAX_GRID_CELLS = 300000;
+const GRID_GROW_EDGE = 240;
+// Yalnız görünen satırları çizmek: bu kadar satırı geçen tabloda ekrandaki satırlar ve üstüne/altına pay çizilir.
+const VIRTUAL_ROWS_THRESHOLD = 300;
+const VIRTUAL_OVERSCAN_ROWS = 30;
+const VIRTUAL_CHUNK_ROWS = 20;
+let rowCount = DEFAULT_GRID_ROWS;
+let colCount = DEFAULT_GRID_COLS;
+/** Çizilen satır penceresi { startRow, endRow } (dondurulmuş satırlar her zaman çizilir); null: hepsi çizili. */
+let renderedRowWindow = null;
 let selectedCell = { row: 0, col: 0 };
 let selectionRange = null;
 let selectionMode = "cell";
@@ -2170,6 +2186,7 @@ function selectAllCells() {
 function focusSelectedCell(shouldScroll = false) {
     if (!selectedCell) return;
 
+    if (shouldScroll) ensureRowRendered(selectedCell.row);
     const cell = getCellElement(selectedCell.row, selectedCell.col);
     if (!cell) return;
 
@@ -3729,15 +3746,15 @@ function createBlankSheetState(name) {
     return {
         id: createSheetId(),
         name,
-        rowCount: 100,
-        colCount: 26,
+        rowCount: DEFAULT_GRID_ROWS,
+        colCount: DEFAULT_GRID_COLS,
         selectedCell: { row: 0, col: 0 },
         selectionRange: null,
         selectionMode: "cell",
         activeFilter: null,
-        tableData: createBlankTableData(100, 26),
-        colWidths: Array.from({ length: 26 }, () => DEFAULT_COL_WIDTH),
-        rowHeights: Array.from({ length: 100 }, () => DEFAULT_ROW_HEIGHT),
+        tableData: createBlankTableData(DEFAULT_GRID_ROWS, DEFAULT_GRID_COLS),
+        colWidths: Array.from({ length: DEFAULT_GRID_COLS }, () => DEFAULT_COL_WIDTH),
+        rowHeights: Array.from({ length: DEFAULT_GRID_ROWS }, () => DEFAULT_ROW_HEIGHT),
         hiddenRows: [],
         hiddenCols: [],
         frozenRows: 0,
@@ -4172,8 +4189,8 @@ async function createNewWorkbook() {
     if (isEditing) exitEditMode(false);
 
     isLoadingWorkbook = true;
-    rowCount = 100;
-    colCount = 26;
+    rowCount = DEFAULT_GRID_ROWS;
+    colCount = DEFAULT_GRID_COLS;
     selectedCell = { row: 0, col: 0 };
     selectionRange = null;
     selectionMode = "cell";
@@ -4855,7 +4872,7 @@ function createHistorySnapshot() {
         selectionRange: cloneRange(selectionRange),
         selectionMode,
         activeFilter: cloneFilter(activeFilter),
-        tableData: cloneTableData(tableData),
+        tableData: packTableDataForHistory(tableData),
         colWidths: [...colWidths],
         rowHeights: [...rowHeights],
         hiddenRows: [...hiddenRows],
@@ -4863,6 +4880,46 @@ function createHistorySnapshot() {
         frozenRows,
         frozenCols
     };
+}
+
+const BLANK_CELL_STYLE = createDefaultCellStyle();
+
+/** Hiçbir değeri, biçimi, kenarlığı, birleştirmesi ve notu olmayan hücre. */
+function isBlankCell(cell) {
+    if (!cell) return true;
+    if ((cell.value !== "" && cell.value !== null && cell.value !== undefined) || cell.formula || cell.merge || cell.mergedTo || cell.note) return false;
+    const borders = cell.borders;
+    if (borders && (borders.top || borders.right || borders.bottom || borders.left)) return false;
+    const style = cell.style;
+    if (style) {
+        for (const key in BLANK_CELL_STYLE) {
+            if (style[key] !== undefined && style[key] !== BLANK_CELL_STYLE[key]) return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Geri alma kopyası: boş hücreler saklanmaz (null), tamamen boş satır null olur. Büyük ama çoğu boş bir
+ * tablonun 60 adımlık geri alma geçmişi böylece yalnız dolu hücreler kadar yer tutar.
+ */
+function packTableDataForHistory(data) {
+    return data.map((row) => {
+        let packed = null;
+        for (let c = 0; c < row.length; c++) {
+            if (isBlankCell(row[c])) continue;
+            packed ??= new Array(row.length).fill(null);
+            packed[c] = cloneCellData(row[c]);
+        }
+        return packed;
+    });
+}
+
+function unpackTableDataFromHistory(packed, rows, cols) {
+    return Array.from({ length: rows }, (_, r) => {
+        const row = packed[r];
+        return Array.from({ length: cols }, (_, c) => (row?.[c] ? cloneCellData(row[c]) : createEmptyCell()));
+    });
 }
 
 function restoreHistorySnapshot(snapshot) {
@@ -4874,7 +4931,7 @@ function restoreHistorySnapshot(snapshot) {
     selectionRange = cloneRange(snapshot.selectionRange);
     selectionMode = snapshot.selectionMode;
     activeFilter = cloneFilter(snapshot.activeFilter);
-    tableData = cloneTableData(snapshot.tableData);
+    tableData = unpackTableDataFromHistory(snapshot.tableData, rowCount, colCount);
     colWidths = [...snapshot.colWidths];
     rowHeights = [...snapshot.rowHeights];
     hiddenRows = new Set(snapshot.hiddenRows ?? []);
@@ -5164,6 +5221,12 @@ function renderSelection() {
     const addRange = (range) => {
         if (!range) return;
         for (let r = Math.max(0, range.minRow); r <= Math.min(rowCount - 1, range.maxRow); r++) {
+            if (!isRowRendered(r)) {
+                // Çizilmemiş satırların hiçbir öğesi yok: pencerenin başına atla.
+                if (renderedRowWindow && r >= frozenRows && r < renderedRowWindow.startRow) r = renderedRowWindow.startRow - 1;
+                else if (renderedRowWindow && r > renderedRowWindow.endRow) break;
+                continue;
+            }
             for (let c = Math.max(0, range.minCol); c <= Math.min(colCount - 1, range.maxCol); c++) {
                 const element = cellElements.get(`${r}:${c}`);
                 if (element) targets.add(element);
@@ -5228,7 +5291,84 @@ function getCellSizeStyle(row, col, merge, zoomScale) {
     return `width:${width}px;min-width:${width}px;max-width:${width}px;height:${height}px;`;
 }
 
+function getRenderedRowHeight(row, zoomScale = getZoomScale()) {
+    return Math.max(18, Math.round((rowHeights[row] ?? DEFAULT_ROW_HEIGHT) * zoomScale));
+}
+
+/** Görünen (gizli ya da süzülmüş olmayan) satırlar ve tablodaki üst konumları (başlık satırı dahil). */
+function getRowLayout() {
+    const zoomScale = getZoomScale();
+    const filter = normalizeFilter(activeFilter);
+    const rows = [];
+    const tops = [];
+    let y = DEFAULT_ROW_HEIGHT;
+    for (let r = 0; r < rowCount; r++) {
+        if (hiddenRows.has(r) || (filter && isRowHiddenByFilter(r))) continue;
+        rows.push(r);
+        tops.push(y);
+        y += getRenderedRowHeight(r, zoomScale);
+    }
+    return { rows, tops, bottom: y };
+}
+
+/** tops içinde y'yi içeren satırın sırası. */
+function findLayoutIndex(tops, y) {
+    let low = 0;
+    let high = tops.length - 1;
+    while (low < high) {
+        const middle = (low + high + 1) >> 1;
+        if (tops[middle] <= y) low = middle;
+        else high = middle - 1;
+    }
+    return low;
+}
+
+/**
+ * Çizilecek satır penceresi: ekrandaki satırlar ve üstüne/altına pay (VIRTUAL_CHUNK_ROWS katlarına yuvarlanır,
+ * böylece her kaydırmada yeniden çizilmez). Pencere kenarındaki birleştirilmiş hücreler bütünüyle içeride kalır.
+ * Küçük tablolarda null: hepsi çizilir.
+ */
+function computeRowWindow(layout) {
+    if (layout.rows.length <= VIRTUAL_ROWS_THRESHOLD || !tableArea) return null;
+    const viewTop = tableArea.scrollTop;
+    const viewBottom = viewTop + (tableArea.clientHeight || window.innerHeight);
+    const first = findLayoutIndex(layout.tops, viewTop);
+    const last = findLayoutIndex(layout.tops, viewBottom);
+    const start = Math.max(0, Math.floor((first - VIRTUAL_OVERSCAN_ROWS) / VIRTUAL_CHUNK_ROWS) * VIRTUAL_CHUNK_ROWS);
+    const end = Math.min(layout.rows.length - 1, Math.ceil((last + VIRTUAL_OVERSCAN_ROWS) / VIRTUAL_CHUNK_ROWS) * VIRTUAL_CHUNK_ROWS);
+    let startRow = layout.rows[start];
+    let endRow = layout.rows[end];
+    for (let pass = 0; pass < 2; pass++) {
+        const row = tableData[startRow] ?? [];
+        for (let c = 0; c < colCount; c++) {
+            const anchor = row[c]?.mergedTo;
+            if (anchor && anchor.row < startRow) startRow = anchor.row;
+        }
+    }
+    for (let r = startRow; r <= endRow; r++) {
+        const row = tableData[r] ?? [];
+        for (let c = 0; c < colCount; c++) {
+            const merge = row[c]?.merge;
+            if (merge) endRow = Math.max(endRow, r + merge.rowspan - 1);
+        }
+    }
+    return { startRow, endRow: Math.min(rowCount - 1, endRow) };
+}
+
+function isRowRendered(row) {
+    return !renderedRowWindow || row < frozenRows || (row >= renderedRowWindow.startRow && row <= renderedRowWindow.endRow);
+}
+
 function renderTable() {
+    renderTableContent();
+    updateFormulaBar();
+    updateToolbarState();
+    updateStatusSummary();
+    scheduleAutoSave();
+}
+
+/** Tabloyu (yalnız çizilecek satırlarla) yeniden kurar; kaydırırken renderTable'ın yan işleri olmadan çağrılır. */
+function renderTableContent() {
     clampFrozenPanes();
 
     const zoomScale = getZoomScale();
@@ -5275,9 +5415,22 @@ function renderTable() {
     }
     html.push("</tr>");
 
-    // Satırlar
-    for (let r = 0; r < rowCount; r++) {
-        if (hiddenRows.has(r) || (filter && isRowHiddenByFilter(r))) continue;
+    // Satırlar: çizilmeyenlerin yerini aynı yükseklikte boş bir satır tutar.
+    const layout = getRowLayout();
+    renderedRowWindow = computeRowWindow(layout);
+    const visibleColumnCount = Array.from({ length: colCount }, (_, c) => c).filter((c) => !hiddenCols.has(c)).length;
+    let pendingSpacer = 0;
+    const flushSpacer = () => {
+        if (!pendingSpacer) return;
+        html.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${visibleColumnCount + 1}" style="height:${pendingSpacer}px;"></td></tr>`);
+        pendingSpacer = 0;
+    };
+    for (const r of layout.rows) {
+        if (!isRowRendered(r)) {
+            pendingSpacer += getRenderedRowHeight(r, zoomScale);
+            continue;
+        }
+        flushSpacer();
 
         const rowHeaderClasses = ["row-header", ...getRowHeaderClasses(r)];
         if (hasHiddenRowAfter(r)) rowHeaderClasses.push("hidden-row-after");
@@ -5362,15 +5515,63 @@ function renderTable() {
         }
         html.push("</tr>");
     }
+    flushSpacer();
 
     table.innerHTML = html.join("");
     indexCellElements();
-
-    updateFormulaBar();
-    updateToolbarState();
-    updateStatusSummary();
-    scheduleAutoSave();
+    updateTouchSelectionHandle();
 }
+
+/** Kaydırınca: pencere değiştiyse yalnız tablo yeniden kurulur (düzenleme sürerken dokunulmaz). */
+function refreshVirtualRows() {
+    if (isEditing || !table.rows.length) return;
+    const next = computeRowWindow(getRowLayout());
+    const current = renderedRowWindow;
+    if (!next && !current) return;
+    if (next && current && next.startRow === current.startRow && next.endRow === current.endRow) return;
+    renderTableContent();
+}
+
+/** Satırı (çizilmemişse) görünür yere kaydırır ve çizer. */
+function ensureRowRendered(row) {
+    if (isRowRendered(row) || !tableArea) return;
+    const layout = getRowLayout();
+    const index = layout.rows.indexOf(row);
+    if (index < 0) return;
+    const top = layout.tops[index];
+    const bottom = top + getRenderedRowHeight(row);
+    if (top < tableArea.scrollTop) tableArea.scrollTop = Math.max(0, top - DEFAULT_ROW_HEIGHT * 2);
+    else if (bottom > tableArea.scrollTop + tableArea.clientHeight) tableArea.scrollTop = bottom - tableArea.clientHeight + DEFAULT_ROW_HEIGHT;
+    if (!isEditing) renderTableContent();
+}
+
+/** Sona yaklaşınca tabloya satır / sütun eklenir (en çok MAX_GRID_ROWS × MAX_GRID_COLS, MAX_GRID_CELLS hücre). */
+function growGridNearEdge() {
+    if (!tableArea || isEditing) return false;
+    let rows = rowCount;
+    let cols = colCount;
+    const nearBottom = tableArea.scrollTop + tableArea.clientHeight > tableArea.scrollHeight - GRID_GROW_EDGE;
+    const nearRight = tableArea.scrollLeft + tableArea.clientWidth > tableArea.scrollWidth - GRID_GROW_EDGE;
+    if (nearBottom && tableArea.scrollTop > 0) rows = Math.min(MAX_GRID_ROWS, rowCount + GRID_GROW_ROWS);
+    if (nearRight && tableArea.scrollLeft > 0) cols = Math.min(MAX_GRID_COLS, colCount + GRID_GROW_COLS);
+    if (rows * cols > MAX_GRID_CELLS) {
+        rows = rowCount;
+        cols = colCount;
+    }
+    if (rows === rowCount && cols === colCount) return false;
+    ensureGridSize(rows, cols);
+    renderTable();
+    return true;
+}
+
+let virtualScrollFrame = 0;
+tableArea?.addEventListener("scroll", () => {
+    if (virtualScrollFrame) return;
+    virtualScrollFrame = requestAnimationFrame(() => {
+        virtualScrollFrame = 0;
+        if (!growGridNearEdge()) refreshVirtualRows();
+    });
+}, { passive: true });
 
 /* Tablo olayları: hücre başına dinleyici yerine tabloda tek bir dinleyici (olay yetkilendirme). */
 let lastHoverKey = null;
@@ -7161,6 +7362,7 @@ function enterEditMode(row, col, initialChar = null) {
     if (internalClipboard || copiedRange || clipboardMode) {
         clearClipboardState(true, false);
     }
+    ensureRowRendered(row);
 
     const cell = getCellElement(row, col);
     if (!cell) return;
@@ -7288,6 +7490,8 @@ cellName.addEventListener("focus", () => {
 cellName.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
         e.preventDefault();
+        // Odak hücreye geçer; aynı Enter genel klavye işleyicisine ulaşıp bir alt satıra indirmesin.
+        e.stopPropagation();
         commitCellNameInput();
     }
 
@@ -7597,6 +7801,7 @@ function moveSelectionTo(position, extend = false) {
     }
     renderSelection();
     if (extend) {
+        ensureRowRendered(target.row);
         getCellElement(target.row, target.col)?.scrollIntoView({ block: "nearest", inline: "nearest" });
         focusSelectedCell();
     } else {

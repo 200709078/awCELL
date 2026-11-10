@@ -2550,3 +2550,10 @@ body.touch-input .freeze-col-divider {
     break-after: auto;
   }
 }
+
+/* === Yalnız görünen satırları çizmek (app.js renderTableContent): çizilmeyen satırların yerini tutan boşluk === */
+#data-table tr.virtual-spacer > td {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
