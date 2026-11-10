@@ -5,17 +5,11 @@
  * tableData, colWidths, rowHeights, hiddenRows, hiddenCols, frozenRows, frozenCols }] }.
  * Hücre: { value, formula, style, borders, merge, mergedTo, note }.
  *
- * Tarayıcıda `AwFileIO` adıyla genele açılır; Node'da (testler) `require` ile yüklenir.
+ * ES modülü: `import AwFileIO from "./fileio.js"` (uygulama ve Node testleri).
  */
-(function (root, factory) {
-    const formula = typeof module === "object" && module.exports ? require("./formula.js") : root.AwFormula;
-    const api = factory(formula);
-    if (typeof module === "object" && module.exports) {
-        module.exports = api;
-    } else {
-        root.AwFileIO = api;
-    }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (F) {
+import AwFormula from "./formula.js";
+
+const AwFileIO = (function (F) {
     "use strict";
 
     const DEFAULT_COL_WIDTH = 84;
@@ -1684,4 +1678,6 @@
         serialToDateText,
         classifyValue
     };
-});
+})(AwFormula);
+
+export default AwFileIO;

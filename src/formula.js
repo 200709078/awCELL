@@ -5,16 +5,9 @@
  * JavaScript kodu çalıştırılmaz. Excel ile aynı adlar (SUM, IF…) ve Türkçe Excel adları (TOPLA,
  * EĞER…) birlikte geçer; bağımsız değişken ayırıcısı "," ya da ";" olabilir.
  *
- * Tarayıcıda `AwFormula` adıyla genele açılır; Node'da (testler) `require` ile yüklenir.
+ * ES modülü: `import AwFormula from "./formula.js"` (uygulama ve Node testleri).
  */
-(function (root, factory) {
-    const api = factory();
-    if (typeof module === "object" && module.exports) {
-        module.exports = api;
-    } else {
-        root.AwFormula = api;
-    }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+const AwFormula = (function () {
     "use strict";
 
     /* ---------- Hatalar ---------- */
@@ -1545,4 +1538,6 @@
         getFunctionNames,
         lookupFunction
     };
-});
+})();
+
+export default AwFormula;

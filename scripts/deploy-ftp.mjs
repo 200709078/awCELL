@@ -1,4 +1,4 @@
-// awCELL'i FTP(S) ile madematik.com'a yükler: `npm run deploy` (derleme yok; uygulama dosyaları doğrudan gider).
+// awCELL'in web sürümünü (dist/) FTP(S) ile madematik.com'a yükler: `npm run deploy` (önce derler).
 // Bağlantı bilgileri .env'de: FTP_HOST, FTP_PORT, FTP_USER, FTP_PASSWORD, FTP_REMOTE_DIR.
 // Sıra: yeni/değişen dosyalar → index.html en son → sunucuda artık kullanılmayan dosyalar silinir.
 // Böylece ziyaretçi yükleme sırasında yarım bir sürüm görmez.
@@ -11,10 +11,8 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 const APP_DIR = "awCELL";
-// Yalnız bunlar yüklenir (README, .gitignore, scripts/, node_modules/ gitmez).
-const SOURCES = ["index.html", "app.js", "formula.js", "fileio.js", "style.css", "sw.js", "manifest.webmanifest", "icons", "vendor"];
 const dryRun = process.argv.includes("--dry-run");
-const localDir = path.resolve(".");
+const localDir = path.resolve("dist");
 
 function fail(message) {
   console.error(`✗ ${message}`);
@@ -37,16 +35,15 @@ const secure = process.env.FTP_SECURE?.trim() !== "false";
 if (path.posix.basename(remoteDir) !== APP_DIR) {
   fail(`FTP_REMOTE_DIR "${remoteDir}" bir ${APP_DIR} klasörü değil; hiçbir şey yüklenmedi.`);
 }
-for (const source of SOURCES) {
-  if (!existsSync(path.join(localDir, source))) fail(`${source} yok; awCELL klasöründe çalıştırın.`);
+if (!existsSync(path.join(localDir, "index.html"))) {
+  fail("dist/index.html yok; önce `npm run build` çalıştırın.");
 }
 
-/** Yüklenecek dosyalar: göreli yol → boyut. */
+/** dist/ içindeki dosyalar: göreli yol → boyut. */
 function localFiles(dir = localDir, prefix = "") {
   const files = new Map();
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const rel = prefix + entry.name;
-    if (!prefix && !SOURCES.includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       for (const [file, size] of localFiles(full, `${rel}/`)) files.set(file, size);
@@ -77,9 +74,9 @@ function parentDirs(file) {
   return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
 }
 
-// vendor/ (Chart.js) nadiren değişir: aynı ad ve boyut varsa yeniden yüklenmez.
+// assets/ dosyalarının adında içerik özeti var: aynı ad ve boyut sunucudaysa yeniden yüklenmez.
 // Diğer dosyalar küçüktür ve her seferinde yüklenir.
-const isStable = (file) => file.startsWith("vendor/");
+const isStable = (file) => file.startsWith("assets/");
 const isHidden = (file) => path.posix.basename(file).startsWith(".");
 
 const client = new Client(30_000);

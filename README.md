@@ -74,52 +74,60 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
 | `Ctrl+ok` | Verinin kenarına atla |
 | `Ctrl+Home` / `Ctrl+End` | İlk / son dolu hücre |
 
-## Çalıştırma
+## Geliştirme
 
-Uygulama saf HTML/CSS/JS'tir; derleme adımı yoktur.
-
-```bash
-python3 -m http.server 8080   # sonra http://localhost:8080
-```
-
-## Test
+Kod düz JavaScript (ES modülleri); Vite ile derlenir. Node 22.13 ya da yenisi gerekir.
 
 ```bash
-npm test    # formül motoru ve dosya biçimleri (node --test, bağımlılık gerekmez)
+npm ci              # ilk seferde
+npm run dev         # http://127.0.0.1:4177 (değişince kendiliğinden yenilenir)
+npm run build       # dist/ — web, Electron ve (ileride) Android aynı çıktıyı kullanır
+npm run preview     # dist/'i http://127.0.0.1:4177'de açar
+npm test            # formül motoru ve dosya biçimleri (node --test)
+npm run electron    # derleyip masaüstü penceresinde açar
+npm run icons       # simgeleri public/icons/app-icon.svg'den yeniden üretir (Inkscape, ImageMagick)
 ```
+
+## Masaüstü paketleri
+
+Linux `.deb` ve AppImage, Windows `.exe`; drAW ailesi ve awPDF ile aynı iş akışıyla
+(`.github/workflows/release.yml`, `scripts/release-assets.mjs`; ikisi beş depoda birebir aynı) yalnız
+GitHub Releases'te, sürüm numarası olmayan adlarla yayımlanır. Sürüm: `npm version patch`, ardından etiket
+gönderilir. Yerelde Linux paketleri: `npm run dist:linux` → `release/`. Android paketi ve Google Play
+yol haritasında (`docs/yol-haritasi.md`).
 
 ## Yayınlama
 
-Canlı adres: [madematik.com/awCELL/](https://madematik.com/awCELL/). Uygulama dosyaları
-(`index.html`, `app.js`, `formula.js`, `fileio.js`, `style.css`, `sw.js`, `manifest.webmanifest`,
-`icons/`, `vendor/`) FTP ile yüklenir:
+Canlı adres: [madematik.com/awCELL/](https://madematik.com/awCELL/). Web sürümü (`dist/`) FTP ile
+yüklenir:
 
 ```bash
-npm ci                         # yalnız ilk seferde (basic-ftp, dotenv)
-npm run deploy -- --dry-run    # yalnız ne yükleneceğini/silineceğini listeler
-npm run deploy                 # yükler; index.html en son gider
+npm run deploy -- --dry-run    # derler, yalnız ne yükleneceğini/silineceğini listeler
+npm run deploy                 # derler ve yükler; index.html en son gider
 ```
 
 Bağlantı bilgileri depoya girmeyen `.env` dosyasındadır: `FTP_HOST`, `FTP_PORT`, `FTP_USER`,
 `FTP_PASSWORD`, `FTP_REMOTE_DIR=/public/awCELL` ve sunucuda TLS olmadığı için `FTP_SECURE=false`.
 Sunucuda artık kullanılmayan dosyalar yalnız awCELL klasöründe silinir; gizli dosyalara dokunulmaz.
 
-`index.html`'deki `?v=` sürüm etiketleri tarayıcı önbelleğini aşmak içindir; JS/CSS değişen her
-yayında tarihle güncellenir. `sw.js` önce ağı dener, ağ yoksa önbelleği kullanır.
+Derlenmiş dosyaların adında içerik özeti vardır (`assets/index-1a2b3c.js`); tarayıcı önbelleği için
+elle sürüm etiketi gerekmez. `sw.js` yalnız web sürümünde çalışır: önce ağı dener, ağ yoksa önbelleği
+kullanır.
 
 ## Proje yapısı
 
 ```
 awCELL/
 ├── index.html            # Uygulama kabuğu, menüler, araç çubuğu, iletişim kutusu
-├── app.js                # Arayüz: tablo çizimi, seçim, düzenleme, sayfalar, grafikler
-├── formula.js            # Formül motoru (belirteç → ayrıştırıcı → değerlendirici), başvuru dönüşümleri
-├── fileio.js             # ZIP, XLSX, ODS, XLS (2003 XML), CSV, PDF; yazdırma sayfaları
-├── style.css             # Tema ve yerleşim
-├── sw.js                 # Çevrimdışı çalışma (önce ağ)
-├── manifest.webmanifest  # Uygulama olarak kurulabilme
-├── icons/                # Arayüz simgeleri, logo (app-icon.svg)
-├── vendor/               # Chart.js (yerel kopya)
+├── src/
+│   ├── app.js            # Arayüz: tablo çizimi, seçim, düzenleme, sayfalar, grafikler (Chart.js)
+│   ├── formula.js        # Formül motoru (belirteç → ayrıştırıcı → değerlendirici), başvuru dönüşümleri
+│   ├── fileio.js         # ZIP, XLSX, ODS, XLS (2003 XML), CSV, PDF; yazdırma sayfaları
+│   └── style.css         # Tema ve yerleşim
+├── public/               # Olduğu gibi kopyalanır: icons/, sw.js, manifest.webmanifest
+├── electron/main.js      # Masaüstü uygulaması (Electron ana süreci)
+├── build/                # Paket simgeleri (icons/, icon.ico; npm run icons üretir)
 ├── tests/                # node --test testleri
-└── scripts/              # deploy-ftp.mjs: madematik.com'a yayın (uygulamaya dahil değil)
+├── docs/yol-haritasi.md  # İstekler ve planlar
+└── scripts/              # deploy-ftp.mjs (web yayını), release-assets.mjs, icons.sh, Electron başlatma
 ```

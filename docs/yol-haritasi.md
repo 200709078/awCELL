@@ -94,6 +94,16 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    `electron/` (pencere, dosya pencereleri), `capacitor.config.json`, `android/`, `build/icons` (logodan),
    `appId` `com.madematik.awcell` (öneri). Canlıya yükleme `dist/`'ten. Android imza secret'ları awCELL
    deposuna da eklenmeli.
+   **Yapıldı (2026-11-10):** kaynaklar `src/` (ES modülleri), `public/` (simgeler, `sw.js`, manifest); Chart.js
+   npm paketi (4.5.1), `vendor/` kalktı; `?v=` etiketleri yerine içerik özetli dosya adları. `electron/main.js`:
+   `awcell://app/` adresi, CSP, sandbox, tek pencere, F11, bağlantılar sistem tarayıcısında, sistem başlık
+   çubuğu (kardeşlerdeki kendi başlık çubuğu sonraya). `package.json` sürüm 0.0.1, `appId`
+   `com.madematik.awcell`. `release.yml` ve `release-assets.mjs` awPDF'tekinin birebir kopyası (yorumdaki
+   "drAW, drAW2D, drAW3D ve awPDF" listesine awCELL, beş dosya birlikte değişirken eklenecek). Service worker
+   yalnız web'de (`https:` ve Capacitor değil). Satır içi `onsubmit` CSP yüzünden `app.js`'e taşındı.
+   Denendi: 22 birim testi, tarayıcıda (vite preview) ve Electron'da arayüz denemesi, Linux paketleri.
+   **Ertelendi:** `capacitor.config.json` ve `android/` 4. adıma kaldı: `release.yml`, `android/` klasörü
+   görünce APK'yı da yayımlıyor; dosya kaydetme Android'e uyarlanmadan yarım bir APK çıkmasın.
 2. **Masaüstü paketleri:** .deb, AppImage, .exe; GitHub Releases, sürüm numarasız adlar.
 3. **Dokunmatik uyarlama:** tablo fare olaylarıyla çalışıyor; telefonda ve tahtada sürükleyerek aralık seçme,
    sütun/satır boyutlandırma, doldurma tutamacı ve sağ tık menüsü (uzun basma) çalışmıyor. Bugün web

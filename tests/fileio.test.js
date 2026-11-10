@@ -1,6 +1,6 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const IO = require("../fileio.js");
+import test from "node:test";
+import assert from "node:assert/strict";
+import IO from "../src/fileio.js";
 
 function cell(value, extra = {}) {
     return {

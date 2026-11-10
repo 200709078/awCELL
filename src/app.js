@@ -3,6 +3,10 @@
 //Hücre düzenleme modunda çift tıklama ile hücre metnininin tümü seçilebilsin.
 //Hücre düzenleme modunda tek tık ile hücre metninin arasına girebileyim.
 //Hücrenin köşesinden tutarak diğer hücrelere çoğaltabileyim.
+
+import Chart from "chart.js/auto";
+import AwFileIO from "./fileio.js";
+import AwFormula from "./formula.js";
 // Butonlar sığmazsa alt satıra geçilsin.
 
 const table = document.getElementById("data-table");
@@ -7731,6 +7735,9 @@ function copyFromMenu(mode) {
 /* ---------- İletişim kutuları (alert/confirm/prompt yerine) ---------- */
 
 const appDialog = document.getElementById("app-dialog");
+// Enter formu göndermesin (düğmeler ve tuşlar kendi işini yapar). HTML'deki onsubmit yerine burada:
+// paketli uygulamanın güvenlik kuralı (CSP) satır içi olay kodunu çalıştırmaz.
+appDialog?.querySelector("form")?.addEventListener("submit", (e) => e.preventDefault());
 
 function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, danger = false } = {}) {
     return new Promise((resolve) => {
@@ -9328,4 +9335,9 @@ function resizeChartWindow(e) {
     chart.element.style.width = `${width}px`;
     chart.element.style.height = `${height}px`;
     chart.instance?.resize();
+}
+
+// Çevrimdışı çalışma yalnız web sürümünde; Electron ve Android paketleri dosyaları zaten içinde taşır.
+if ("serviceWorker" in navigator && location.protocol === "https:" && !window.Capacitor) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
 }

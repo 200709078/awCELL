@@ -1,13 +1,86 @@
 {
   "name": "awcell",
+  "productName": "awCELL",
+  "desktopName": "awcell",
+  "version": "0.0.1",
   "private": true,
-  "description": "awCELL: test ve yayın betikleri için; uygulamanın kendisi bağımlılık kullanmaz",
+  "type": "module",
+  "description": "awCELL — elektronik tablo uygulaması",
+  "author": "mADEMatik <ademvarol@madematik.com>",
+  "license": "MIT",
+  "homepage": "https://www.madematik.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/200709078/awCELL.git"
+  },
+  "main": "electron/main.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "node --test tests/*.test.js",
-    "deploy": "node scripts/deploy-ftp.mjs"
+    "deploy": "npm run build && node scripts/deploy-ftp.mjs",
+    "electron": "npm run build && node scripts/start-electron.mjs",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "icons": "bash scripts/icons.sh"
+  },
+  "build": {
+    "appId": "com.madematik.awcell",
+    "productName": "awCELL",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "artifactName": "${productName}-${os}-${arch}.${ext}",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icons",
+      "category": "Office;Spreadsheet;Education",
+      "executableName": "awcell",
+      "syncDesktopName": true,
+      "desktop": {
+        "entry": {
+          "Name": "awCELL",
+          "Comment": "Elektronik tablo"
+        }
+      }
+    },
+    "deb": {
+      "packageCategory": "education"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "awCELL"
+    }
   },
   "devDependencies": {
     "basic-ftp": "^6.2.3",
-    "dotenv": "^17.4.2"
+    "chart.js": "4.5.1",
+    "dotenv": "^17.4.2",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.3.4"
   }
 }

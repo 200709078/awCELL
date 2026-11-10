@@ -1,11 +1,12 @@
 // awCELL service worker: önce ağ, ağ yoksa önbellek. Böylece yayınlanan yeni sürüm hemen gelir,
-// internet kesikken de son açılan sürüm çalışır.
-const CACHE = "awcell-v1";
+// internet kesikken de son açılan sürüm çalışır. Derlenmiş dosyaların adında içerik özeti olduğundan
+// (assets/app-1a2b3c.js) önceden listelenmez; sayfa açılınca kullanılanlar önbelleğe girer.
+const CACHE = "awcell-v2";
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open(CACHE)
-            .then((cache) => cache.addAll(["./", "index.html", "style.css", "app.js", "formula.js", "fileio.js", "vendor/chart.js"]))
+            .then((cache) => cache.addAll(["./", "index.html"]))
             .catch(() => {})
             .then(() => self.skipWaiting())
     );

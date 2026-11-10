@@ -16,9 +16,10 @@ npm-debug.log*
 # Bağımlılıklar (kullanılırsa)
 node_modules/
 
-# Yerel sunucu artıkları
+# Derleme ve paket çıktıları
 .cache/
 dist/
+release/
 
 # FTP yayın bilgileri (scripts/deploy-ftp.mjs) asla depoya girmez
 .env

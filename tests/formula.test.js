@@ -1,6 +1,6 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const F = require("../formula.js");
+import test from "node:test";
+import assert from "node:assert/strict";
+import F from "../src/formula.js";
 
 /** Basit bir çalışma kitabı: sheets = { Ad: { A1: "5", B1: "=A1*2" } } */
 function workbook(sheets) {
