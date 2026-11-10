@@ -9636,6 +9636,6 @@ setupAndroid({
 });
 
 // Çevrimdışı çalışma yalnız web sürümünde; Electron ve Android paketleri dosyaları zaten içinde taşır.
-if ("serviceWorker" in navigator && location.protocol === "https:" && !window.Capacitor) {
+if ("serviceWorker" in navigator && location.protocol === "https:" && !window.Capacitor?.isNativePlatform?.()) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
