@@ -8774,8 +8774,21 @@ function createChartWindow(config = null, data = null, savedState = null, should
     chart.titleReference = savedState?.titleReference ? { ...savedState.titleReference } : null;
 
     chart.element.className = "chart-panel";
-    chart.element.style.left = `${savedState?.left ?? 96 + ((chartNumber - 1) % 6) * 28}px`;
-    chart.element.style.top = `${savedState?.top ?? 64 + ((chartNumber - 1) % 6) * 28}px`;
+    if (savedState?.left !== undefined && savedState?.top !== undefined) {
+        chart.element.style.left = `${savedState.left}px`;
+        chart.element.style.top = `${savedState.top}px`;
+    } else {
+        // Yeni pencere görünen alanın içinde ve ekrana sığacak boyutta açılır (telefonda taşmasın).
+        const offset = ((chartNumber - 1) % 6) * 28;
+        const viewWidth = tableArea?.clientWidth || window.innerWidth;
+        const viewHeight = tableArea?.clientHeight || window.innerHeight;
+        const width = Math.max(260, Math.min(520, viewWidth - 16));
+        const height = Math.max(180, Math.min(300, viewHeight - 24));
+        chart.element.style.width = `${width}px`;
+        chart.element.style.height = `${height}px`;
+        chart.element.style.left = `${(tableArea?.scrollLeft ?? 0) + Math.max(8, Math.min(96 + offset, viewWidth - width - 8))}px`;
+        chart.element.style.top = `${(tableArea?.scrollTop ?? 0) + Math.max(8, Math.min(64 + offset, viewHeight - height - 8))}px`;
+    }
     if (savedState?.width) chart.element.style.width = `${savedState.width}px`;
     if (savedState?.height) chart.element.style.height = `${savedState.height}px`;
     chart.element.innerHTML = `

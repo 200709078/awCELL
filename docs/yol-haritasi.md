@@ -143,6 +143,23 @@ Capacitor web sayfasını paketler. Önce altyapı, sonra uyarlamalar gerekir.
    kullanımda kaydetme bir kez daha denenmeli. Paylaş (başka uygulamaya gönder) yok.
 5. **Play Store:** imzalı .aab (`play-Android` artifact'ı), gizlilik politikası (awPDF `gizlilik.html` örnek),
    mağaza simgesi ve ekran görüntüleri.
+   **Hazırlandı (2026-11-10):** `public/gizlilik.html` (canlıda madematik.com/awCELL/gizlilik.html),
+   `docs/play/magaza.md` (ad, kısa ve tam açıklama, kategori, beyan önerileri, 1.1.0 sürüm notu; `node
+   scripts/play/sinirlar.mjs` sınırları denetler), `docs/play/` simge, öne çıkan görsel ve telefon / 7" / 10" tablet
+   ekran görüntüleri (`npm run play:gorseller`; uydurma not çizelgesi). İmzalı AAB: v1.1.0 iş akışının
+   `play-Android` artifact'ı (yerelde `release/awCELL-android.aab`, depoya girmez).
+   Görsellerde bulunan hata düzeltildi: yeni grafik penceresi dar ekranda taşıyor, kaydırılmış tabloda görünmeyen
+   yere açılıyordu.
+   **Kullanıcının Play Console'da yapacakları** (awPDF'teki sırayla, bir seferde bir adım):
+   1. Uygulama oluştur: ad "awCELL: Elektronik Tablo", dil Türkçe, Uygulama, Ücretsiz.
+   2. Uygulama bütünlüğü → Uygulama imzalama → "Anahtarı değiştir" → "Bu geliştirici hesabındaki başka bir uygulamayla
+      aynı anahtarı kullan" → awPDF (PEPK gerekmez). Doğrulama: SHA-256 `84:F7:8D:F0:…`.
+   3. Mağaza kaydı ve uygulama içeriği beyanları (`docs/play/magaza.md`).
+   4. Dahili test: AAB'yi yükle, telefonda Play'den kurup dene.
+   5. Kapalı test: en az 12 testçi, kesintisiz 14 gün (awPDF'teki testçi listesi kullanılabilir).
+   6. Üretim erişimi başvurusu ve yayın.
+   Açık soru: Play sırasında (awPDF → drAW → drAW2D → drAW3D) awCELL'in yeri; kapalı test awPDF'inkiyle aynı
+   anda yürüyebilir (her uygulamanın 14 günü ayrı sayılır).
 
 **Kullanıcı kararı (2026-11-10):** APK de GitHub sürümünde, kardeşlerle aynı imzayla yayımlanır; bütün
 paketler (deb, AppImage, exe, apk) GitHub sürümünde. Sürüm 1.0.0'dan başlar (yalnız awCELL), gerekli

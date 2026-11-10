@@ -32,7 +32,8 @@
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
     "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
-    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug"
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "play:gorseller": "npm run build && node scripts/play/gorseller.mjs"
   },
   "build": {
     "appId": "com.madematik.awcell",
@@ -111,6 +112,7 @@
     "dotenv": "^17.4.2",
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3",
+    "playwright": "^1.64.1",
     "vite": "^8.3.4"
   }
 }
