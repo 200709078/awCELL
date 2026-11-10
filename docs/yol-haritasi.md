@@ -207,7 +207,7 @@ Kullanıcı: varsayılan 100 satır; mümkün olduğunca satır ve sütun sayıs
   ile fare, klavye, Ad kutusu, geri alma, tümünü seç, dondurma, birleştirme ve dokunma taklidi. Bu sırada eskiden
   beri olan bir hata düzeltildi: Ad kutusuna "C5" yazıp Enter'a basınca C6 seçiliyordu.
 
-## Hakkında penceresi (2026-11-10, kullanıcı kararı; drAW2D'de uygulandı; bu projede kodlanmadı)
+## Hakkında penceresi (2026-11-10, kullanıcı kararı; awCELL'de uygulandı)
 
 Kullanıcı: "Hakkında yardım gibi ayrı pencerede açılsa nasıl olur?" → "tamam öyle yapalım. Diğer kardeşlere de bunu not et
 (özellikle hakkında kısmı hepsinde olmalı)." Aile kuralı: drAW, drAW2D, drAW3D, awPDF ve awCELL'in **hepsinde** Hakkında olur.
@@ -220,4 +220,9 @@ Kullanıcı: "Hakkında yardım gibi ayrı pencerede açılsa nasıl olur?" → 
 - **Yer:** Dosya menüsünün en altı (drAW2D kararı); Yardım da hem çubukta hem Dosya menüsünde kalır.
 - **awCELL'e uyarlama (öneri):** awCELL'in üst menüsünde "Yardım" menüsü var; Hakkında onun en altına girer. Sağ alttaki
   "mADEMatik Solutions" imzası kalabilir ya da Hakkında'ya taşınabilir; gizlilik politikası bağlantısı da Hakkında'ya eklenir.
+- **Uygulandı (2026-11-10, kullanıcı isteği: "Dosya veya Yardım menüsüne en alta"):** Yardım menüsünün en altında çizgiyle
+  ayrılmış "Hakkında". Ayrı küçük pencere (`#about-dialog`): simge, awCELL ve sürüm (`package.json`'dan, `__APP_VERSION__`),
+  "Elektronik tablo", mADEMatik Solutions / madematik.com, İndir → madematik.com/projelerim/awcell#indirmeler (sayfadaki indirme
+  bölümü site SQL'iyle eklenir), Lisans MIT, Gizlilik politikası, İletişim (seçilebilir yazı). Kapanma: ×, Esc, dışarıya
+  tıklama, Android geri tuşu. Sağ alttaki imza yerinde kaldı.
 

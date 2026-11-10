@@ -6535,7 +6535,31 @@ helpMenu?.addEventListener("click", (e) => {
     hideHelpMenu();
     if (button.dataset.helpAction === "functions") showFunctionHelp();
     if (button.dataset.helpAction === "shortcuts") showShortcutHelp();
+    if (button.dataset.helpAction === "about") showAbout();
 });
+
+// Hakkında: kendi küçük penceresi; ×, Esc, dışarıya tıklama ve Android geri tuşu kapatır.
+const aboutDialog = document.getElementById("about-dialog");
+const aboutVersion = document.getElementById("about-version");
+if (aboutVersion) aboutVersion.textContent = `sürüm ${__APP_VERSION__}`;
+
+function showAbout() {
+    if (aboutDialog && !aboutDialog.open) aboutDialog.showModal();
+}
+
+document.getElementById("about-close")?.addEventListener("click", () => aboutDialog?.close());
+aboutDialog?.addEventListener("click", (event) => {
+    if (event.target === aboutDialog) aboutDialog.close();
+});
+// Android'de bağlantılar uygulamanın içinde değil, telefonun tarayıcısında açılır.
+if (isAndroidApp()) {
+    for (const link of aboutDialog?.querySelectorAll('a[href^="https://"]') ?? []) {
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            window.location.assign(link.href);
+        });
+    }
+}
 
 const FUNCTION_HELP = [
     ["TOPLA / SUM", "=TOPLA(A1:A10)", "Sayıları toplar."],
@@ -9808,6 +9832,10 @@ setupDesktop({
 
 /** Android geri tuşu: açık olan bir şeyi kapatır; kapatacak bir şey yoksa false (uygulama arka plana geçer). */
 function handleAndroidBack() {
+    if (aboutDialog?.open) {
+        aboutDialog.close();
+        return true;
+    }
     if (appDialog?.open) {
         (appDialog.querySelector(".app-dialog-cancel:not([hidden])") ?? appDialog.querySelector(".app-dialog-confirm"))?.click();
         return true;
