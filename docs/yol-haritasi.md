@@ -226,3 +226,6 @@ Kullanıcı: "Hakkında yardım gibi ayrı pencerede açılsa nasıl olur?" → 
   bölümü site SQL'iyle eklenir), Lisans MIT, Gizlilik politikası, İletişim (seçilebilir yazı). Kapanma: ×, Esc, dışarıya
   tıklama, Android geri tuşu. Sağ alttaki imza yerinde kaldı.
 
+## Yayın 1.1.2 (2026-11-10, kullanıcı izniyle)
+
+GitHub sürümü v1.1.2 ve madematik.com/awCELL canlıda; içinde Hakkında penceresi. madematik.com/projelerim/awcell sayfasına indirme bölümü site SQL'iyle eklenir (`~/Masaüstü/madematik_indirmeler_2026-11-11.sql`, dört paket).
