@@ -820,9 +820,14 @@
         accept=".awc,.xlsx,.xlsm,.ods,.csv,.tsv,.txt,.xls,application/json,text/csv" />
 
     <div id="restore-bar" role="status" hidden>
-        <span class="restore-bar-text"></span>
-        <button class="restore-bar-restore" type="button">Geri yükle</button>
-        <button class="restore-bar-dismiss" type="button">Kapat</button>
+        <span class="restore-bar-text">
+            <span class="restore-bar-title"></span>
+            <span>Geri yüklemek ister misiniz?</span>
+        </span>
+        <span class="restore-bar-actions">
+            <button class="restore-bar-restore" type="button">Geri Yükle</button>
+            <button class="restore-bar-dismiss" type="button">Kapat</button>
+        </span>
     </div>
 
     <div id="app-toast" role="status" hidden></div>

@@ -229,3 +229,16 @@ Kullanıcı: "Hakkında yardım gibi ayrı pencerede açılsa nasıl olur?" → 
 ## Yayın 1.1.2 (2026-11-10, kullanıcı izniyle)
 
 GitHub sürümü v1.1.2 ve madematik.com/awCELL canlıda; içinde Hakkında penceresi. madematik.com/projelerim/awcell sayfasına indirme bölümü site SQL'iyle eklenir (`~/Masaüstü/madematik_indirmeler_2026-11-11.sql`, dört paket).
+
+## "Son çalışmanız bulundu" uyarısı (2026-11-14, kullanıcı bildirdi; düzeltildi)
+
+Kullanıcı: telefonda açılıştaki uyarı penceresi çok kötü; "Son çalışmanız bulundu (dosya adı). / Geri yüklemek ister misiniz? /
+Geri Yükle  Kapat" biçiminde, toast tarzı olsun; tarih ve saate gerek var mı?
+
+**Düzeltildi:** Uyarı `left: 50% + translateX` ile konumlandığı için telefonda ekranın yarısı genişliğe sıkışıyor, "Geri yükle"
+yazısı bölünüyordu (aynı kusur `#app-toast`'ta da vardı, ikisi de düzeltildi: iki yandan 16 px payla ortalanır). Uyarı artık
+iki satır (dosya adıyla) ve altında "Geri Yükle", "Kapat"; dokunmatikte 40 px düğmeler. Dosya adı otomatik kayda eklendi
+(`fileName`, yalnız otomatik kayıtta; .awc dosyaları değişmedi); otomatik kayıttan yüklenince ve geri yüklenince pencere başlığına
+döner. Tarih yalnız adı olmayan (hiç kaydedilmemiş) tabloda gösterilir: "kaydedilmemiş tablo, 14.11 19:22" (Android'in tr-TR
+biçimi 14/11 olduğu için elle biçimlendirilir). Telefonda (awCELL Deneme) adlı ve adsız durum ile Geri Yükle denendi.
+

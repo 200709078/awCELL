@@ -4300,7 +4300,9 @@ function saveAutoSavedWorkbook() {
     if (!isAppInitialized || isLoadingWorkbook) return;
 
     try {
-        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(createSavePayload()));
+        // The file's name (window title) goes with the autosave only, for the restore prompt; .awc files are unchanged.
+        const shownName = document.title.replace(/ - awCELL$/, "");
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ...createSavePayload(), fileName: shownName !== "awCELL" ? shownName : null }));
     } catch {
         // localStorage doluysa sessiz geç; normal dosyaya kaydetme çalışmaya devam eder.
     }
@@ -4313,13 +4315,20 @@ function scheduleAutoSave() {
     autoSaveTimer = window.setTimeout(saveAutoSavedWorkbook, 600);
 }
 
+/** An autosave keeps the file's name (window title); loading it shows the name again, so the next autosave keeps it too. */
+function restoreShownFileName(payload) {
+    if (typeof payload?.fileName === "string" && payload.fileName.trim()) document.title = `${payload.fileName.trim()} - awCELL`;
+}
+
 function loadAutoSavedWorkbook() {
     const storedPayload = safeStorageGet(AUTOSAVE_KEY);
     if (!storedPayload) return false;
 
     try {
         isLoadingWorkbook = true;
-        loadWorkbookPayload(JSON.parse(storedPayload));
+        const payload = JSON.parse(storedPayload);
+        loadWorkbookPayload(payload);
+        restoreShownFileName(payload);
         return true;
     } catch {
         safeStorageRemove(AUTOSAVE_KEY);
@@ -8478,12 +8487,17 @@ function offerPreviousSessionRestore() {
     }
     const payload = JSON.parse(stored);
 
+    // The file's name says which work it is; a never-saved table is named by when it was last edited.
     const savedAt = payload.savedAt ? new Date(payload.savedAt) : null;
+    // Written out by hand: Android's WebView formats tr-TR dates as 14/11, desktop browsers as 14.11.
+    const two = (number) => String(number).padStart(2, "0");
     const when = savedAt && !Number.isNaN(savedAt.getTime())
-        ? savedAt.toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        ? `${two(savedAt.getDate())}.${two(savedAt.getMonth() + 1)} ${two(savedAt.getHours())}:${two(savedAt.getMinutes())}`
         : "";
-    bar.querySelector(".restore-bar-text").textContent =
-        `Son çalışmanız bulundu${when ? ` (${when})` : ""}. Geri yüklemek ister misiniz?`;
+    const label = typeof payload.fileName === "string" && payload.fileName.trim()
+        ? payload.fileName.trim()
+        : when ? `kaydedilmemiş tablo, ${when}` : "";
+    bar.querySelector(".restore-bar-title").textContent = `Son çalışmanız bulundu${label ? ` (${label})` : ""}.`;
     bar.hidden = false;
 
     const close = () => {
@@ -8495,6 +8509,8 @@ function offerPreviousSessionRestore() {
         try {
             isLoadingWorkbook = true;
             loadWorkbookPayload(payload);
+            // The window shows the restored file's name again (saving still asks where, as before).
+            restoreShownFileName(payload);
         } finally {
             isLoadingWorkbook = false;
         }
