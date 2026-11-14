@@ -242,3 +242,9 @@ iki satır (dosya adıyla) ve altında "Geri Yükle", "Kapat"; dokunmatikte 40 p
 döner. Tarih yalnız adı olmayan (hiç kaydedilmemiş) tabloda gösterilir: "kaydedilmemiş tablo, 14.11 19:22" (Android'in tr-TR
 biçimi 14/11 olduğu için elle biçimlendirilir). Telefonda (awCELL Deneme) adlı ve adsız durum ile Geri Yükle denendi.
 
+## Yayın 1.1.3 (2026-11-14, kullanıcı isteği)
+
+Kullanıcı: "yeni sürüme geçerek yayınla. sql de hazırla." (Aynı sürüme dahil etme yerine.) GitHub sürümü v1.1.3 (apk, deb,
+AppImage, exe) ve madematik.com/awCELL canlıda; içinde "Son çalışmanız bulundu" uyarısının düzeltmesi. Site indirme kayıtları
+için SQL: `~/Masaüstü/madematik_awcell_1.1.3_2026-11-14.sql` (yerel veritabanında iki kez denendi).
+
