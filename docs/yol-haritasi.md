@@ -254,3 +254,14 @@ Kullanıcı awPDF'in üretime geçmesini beklemeden awCELL'i de (drAW ailesiyle 
 yüklenen sürüm 1.1.3 (kod 10103); mağaza metnine 1.1.3 notu eklendi (1.1.1 notu Play'e girmedi). Görseller yeniden
 üretildi, yalnız grafik renkleri (rastgele) değişti; eskileri kaldı. AAB: v1.1.3 iş akışının `play-Android` artifact'ı.
 Dosyalar `~/Belgeler/Play/awCELL/` (geçici; kullanıcı silecek). Play Console adımları yukarıdaki 5. maddedeki sırayla.
+
+## Karşılama (giriş) ekranı (2026-11-17, kullanıcı isteği; henüz kodlanmayacak)
+
+Kullanıcı: awPDF'teki karşılama / giriş ekranı awCELL'e de (ve awDOC'a) eklensin; "henüz kodlama".
+awPDF'te bu ekran şöyle: ortada yalnız logo (ad yazısı yok), altında ana iş düğmeleri (ana düğme mavi), en altta
+"Son Dosyalar" listesi ve "Listeyi Temizle". Ekran dosya açık değilken görünür (`#emptyState`).
+- **Öneri (Claude):** düğmeler **Yeni Tablo** (ana düğme), **Aç**, belki **CSV / Excel Aç**; altında awCELL'in son
+  dosyaları. Bugün awCELL doğrudan boş bir tabloyla açılıyor: karşılama ekranı açılışta mı gelsin, yoksa
+  yalnız son tablo kapatılınca mı, karar kullanıcının. Kurtarma kopyası sorusu ("Son çalışmanız bulundu")
+  ekranla çakışmamalı.
+- Ailede ortak görünüm için awDOC'takiyle birlikte yapılır.
