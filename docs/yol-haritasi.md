@@ -253,4 +253,4 @@ için SQL: `~/Masaüstü/madematik_awcell_1.1.3_2026-11-14.sql` (yerel veritaban
 Kullanıcı awPDF'in üretime geçmesini beklemeden awCELL'i de (drAW ailesiyle birlikte) Play'e çıkarmaya karar verdi. İlk
 yüklenen sürüm 1.1.3 (kod 10103); mağaza metnine 1.1.3 notu eklendi (1.1.1 notu Play'e girmedi). Görseller yeniden
 üretildi, yalnız grafik renkleri (rastgele) değişti; eskileri kaldı. AAB: v1.1.3 iş akışının `play-Android` artifact'ı.
-Dosyalar masaüstünde `~/Masaüstü/Play/awCELL/`. Play Console adımları yukarıdaki 5. maddedeki sırayla.
+Dosyalar `~/Belgeler/Play/awCELL/` (geçici; kullanıcı silecek). Play Console adımları yukarıdaki 5. maddedeki sırayla.
