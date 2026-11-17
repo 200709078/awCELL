@@ -265,3 +265,14 @@ awPDF'te bu ekran şöyle: ortada yalnız logo (ad yazısı yok), altında ana i
   yalnız son tablo kapatılınca mı, karar kullanıcının. Kurtarma kopyası sorusu ("Son çalışmanız bulundu")
   ekranla çakışmamalı.
 - Ailede ortak görünüm için awDOC'takiyle birlikte yapılır.
+- **Ayrıntılı öneri (2026-11-17, kullanıcı "not olarak ekle" dedi; kodlama yok):**
+  - Görünüm awPDF'teki gibi: yalnız logo, mavi ana düğme, çerçeveli öbür düğmeler, altta son dosyalar ve
+    "Listeyi Temizle".
+  - Düğmeler: **Yeni Tablo** (ana), **Aç**, dönüştürmeler **Excel → PDF**, **CSV → Excel**, **ODS → Excel**,
+    **Excel → ODS**. awCELL bunları bugün okuyup yazabiliyor; awPDF'teki gibi dosya seçilir, dönüştürülür,
+    kaydedilir, tablo açılmaz.
+  - Ne zaman: açılışta. Uygulama bir dosyayla açılırsa ("Birlikte aç", Android) görünmez. ☰ menüsünde
+    "Giriş ekranı" ile dönülür.
+  - "Son çalışmanız bulundu" uyarısı ayrı pencere yerine giriş ekranında kart olur (Geri Yükle / Sil).
+  - Tahmini iş: yaklaşık bir gün (testlerle).
+  - awDOC'taki karşılama ekranıyla birlikte konuşulacak.
