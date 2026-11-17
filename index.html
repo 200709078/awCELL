@@ -26,6 +26,11 @@
                     <div class="menu-shell">
                         <button id="file-menu-btn" type="button">Dosya</button>
                         <div id="file-menu" class="text-menu-popover" hidden>
+                            <button id="welcome-file-btn" type="button">
+                                <img src="/icons/app-icon.svg" alt="" />
+                                <span>Giriş ekranı</span>
+                            </button>
+                            <hr>
                             <button id="new-file-btn" type="button">
                                 <img src="/icons/new.svg" alt="" />
                                 <span>Yeni</span>
@@ -815,6 +820,29 @@
             <span>m</span><span class="made-highlight">ADEM</span><span>atik Solutions</span>
         </a>
     </main>
+
+    <!-- Giriş ekranı, awPDF'inki gibi (kullanıcı kararı 2026-11-18): yeni tablo, açma, dönüştürmeler. -->
+    <section id="welcome-screen" class="welcome" aria-label="Giriş" hidden>
+        <img src="/icons/app-icon.png" width="128" height="128" alt="awCELL" />
+        <div class="welcome-actions">
+            <button id="welcome-new" class="welcome-primary" type="button">Yeni Tablo</button>
+            <button id="welcome-open" type="button">Tablo Aç</button>
+            <button id="welcome-xlsx-pdf" type="button" aria-label="Excel tablosunu PDF'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> PDF</button>
+            <button id="welcome-csv-xlsx" type="button" aria-label="CSV dosyasını Excel'e dönüştür">CSV <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
+            <button id="welcome-ods-xlsx" type="button" aria-label="LibreOffice tablosunu Excel'e dönüştür">ODS <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
+            <button id="welcome-xlsx-ods" type="button" aria-label="Excel tablosunu LibreOffice'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> ODS</button>
+            <button id="welcome-back" type="button" hidden>Tabloya Dön</button>
+        </div>
+        <div id="welcome-restore" class="welcome-restore" role="status" hidden>
+            <span class="restore-bar-title"></span>
+            <span>Geri yüklemek ister misiniz?</span>
+            <span class="welcome-restore-actions">
+                <button class="restore-bar-restore welcome-primary" type="button">Geri Yükle</button>
+                <button class="restore-bar-dismiss" type="button">Sil</button>
+            </span>
+        </div>
+        <label class="welcome-startup"><input id="welcome-at-start" type="checkbox" /> Açılışta bu ekranı göster</label>
+    </section>
 
     <input id="open-file-input" class="hidden-file-input" type="file"
         accept=".awc,.xlsx,.xlsm,.ods,.csv,.tsv,.txt,.xls,application/json,text/csv" />

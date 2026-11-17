@@ -7,7 +7,8 @@
  *   ekranı açılır.
  * - "Birlikte aç": başka uygulamadan gelen tablolar açılır.
  * - Yazdırma: sayfa görüntüleri yalnız yazdırmada görünen bir alana konur, Android yazdırır.
- * - Geri tuşu: önce açık menü, pencere ya da düzenleme kapanır; açık bir şey yoksa uygulama arka plana geçer.
+ * - Geri tuşu (awPDF gibi): önce açık menü, pencere ya da düzenleme kapanır; sonra tablo kapanır (içi
+ *   doluysa sorulur) ve giriş ekranı gelir; giriş ekranındayken uygulama arka plana geçer.
  */
 import { Capacitor, registerPlugin } from "@capacitor/core";
 

@@ -276,3 +276,31 @@ awPDF'te bu ekran şöyle: ortada yalnız logo (ad yazısı yok), altında ana i
   - "Son çalışmanız bulundu" uyarısı ayrı pencere yerine giriş ekranında kart olur (Geri Yükle / Sil).
   - Tahmini iş: yaklaşık bir gün (testlerle).
   - awDOC'taki karşılama ekranıyla birlikte konuşulacak.
+- **Kullanıcı kararı (2026-11-18): "hepsini yap"** (awDOC'taki giriş ekranından sonra awCELL'e de). Geri tuşu da
+  awPDF'teki gibi ("geri düğmesi davranışı da awPDF deki gibi olsun mümkün olduğunca"). **Uygulandı (2026-11-18):**
+  - **Ekran:** awPDF'in ilk ekranının düzeni: logo, aynı genişlikte alt alta düğmeler.
+    - **Yeni Tablo** (mavi), **Tablo Aç**.
+    - Dönüştürmeler: **Excel → PDF**, **CSV → Excel**, **ODS → Excel**, **Excel → ODS**. Dosya seçilir (seçicide
+      yalnız o tür), açılır ve hedef biçimde kaydedilir ("notlar.csv" → "notlar.xlsx"); awPDF'in PDF → Word'ü gibi.
+  - **"Son çalışmanız bulundu":** Ekran açıkken kart olarak orada çıkar (Geri Yükle / Sil). Kart dururken
+    başka tablo açılırsa alttaki çubukta yine sorulur.
+  - **"Açılışta bu ekranı göster" kutusu** (`awcell.girisEkrani`).
+  - **Açılış:** Uygulama bu ekranla açılır. Sayfa yenilenince (çalışma sürerken) açılmaz. Bir dosyayla
+    açılırsa ("Birlikte aç") ekran kendiliğinden kapanır: her dosya `openWorkbookFile`'dan geçer.
+  - **Dosya → "Giriş ekranı":** Ekranı tablonun üstüne açar; "Tabloya Dön" geri getirir.
+  - **Klavye:** Ekran açıkken tuşlar ve yapıştırma arkadaki tabloya gitmez.
+  - **Android geri tuşu (awPDF'teki sırayla):**
+    1. Pencere, düzenleme, menüler, Bul, grafik ayarları (önceki gibi).
+    2. Tablonun üstüne açılmış giriş ekranı (tabloya döner).
+    3. Tablo kapanır (içi doluysa sorulur), giriş ekranı gelir.
+    4. Giriş ekranındayken uygulama arka plana geçer.
+  - **Son dosyalar listesi:** awCELL'de yok (awPDF'te var); istenirse ayrıca yapılır.
+  - **Bulunup düzeltilen eski hata:** Boş tablo denetimi (`isSheetEmpty`) tabloyu 100 × 26 sanıyordu;
+    tablo f6d3dc6'dan beri 200 × 52 ve kaydırdıkça büyüyor. Bu yüzden her yeni tablo "dolu" sayılıyordu:
+    "Yeni" boş tabloda da "kapatılsın mı" diye soruyordu; boş bir oturum da geri önerilebiliyordu. Boyut
+    denetimden çıkarıldı.
+  - **Denemeler:**
+    - Chromium'da (awDOC'un Playwright'ıyla, geliştirme sunucusuna karşı) denendi: açılış, tuşların
+      sızmaması, Tabloya Dön, kurtarma kartı, CSV → Excel ve Excel → PDF.
+    - Android geri tuşu, köprü taklidiyle denendi.
+    - Telefonda ve Electron'da denenmedi (kullanıcı: telefon denemesi sonra hepsi için).

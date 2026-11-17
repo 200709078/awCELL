@@ -3802,7 +3802,9 @@ function hasCellContent(cell) {
 function isSheetEmpty(sheet) {
     if (!sheet) return true;
 
-    if ((Number(sheet.rowCount) || 0) !== 100 || (Number(sheet.colCount) || 0) !== 26) return false;
+    // The size says nothing: the grid starts at 200 × 52 and grows as it is scrolled (it was checked
+    // against 100 × 26 until 2026-11-18, so every new table counted as written: Yeni asked, and an
+    // empty session was offered back).
     if (sheet.activeFilter) return false;
     if ((sheet.hiddenRows?.length ?? 0) > 0 || (sheet.hiddenCols?.length ?? 0) > 0) return false;
     if ((Number(sheet.frozenRows) || 0) > 0 || (Number(sheet.frozenCols) || 0) > 0) return false;
@@ -4226,6 +4228,7 @@ async function createNewWorkbook() {
     focusSelectedCell();
     isLoadingWorkbook = false;
     saveAutoSavedWorkbook();
+    hideWelcome();
     return true;
 }
 
@@ -4608,7 +4611,21 @@ function createImportedPayload(result) {
     };
 }
 
+/**
+ * Every file that comes in goes through here (the picker, the file input, "Birlikte aç" on the
+ * desktop and Android): the welcome screen closes, and a conversion chosen there is saved.
+ */
 async function openWorkbookFile(file, handle = null) {
+    const opened = await loadWorkbookFromFile(file, handle);
+    if (!opened) return false;
+    hideWelcome();
+    const conversion = pendingConversion;
+    pendingConversion = null;
+    if (conversion && Date.now() < conversion.expires) await saveWorkbookAsFormat(conversion.extension);
+    return true;
+}
+
+async function loadWorkbookFromFile(file, handle = null) {
     if (!file) return false;
 
     const extension = getFileExtension(file.name);
@@ -4646,10 +4663,10 @@ async function openWorkbookFile(file, handle = null) {
     return true;
 }
 
-async function openWorkbook() {
+async function openWorkbook(types = OPEN_FILE_TYPES) {
     if ("showOpenFilePicker" in window) {
         const [handle] = await window.showOpenFilePicker({
-            types: OPEN_FILE_TYPES,
+            types,
             multiple: false
         });
         const file = await handle.getFile();
@@ -8478,7 +8495,8 @@ function safeStorageRemove(key) {
 /** Sekme kapanıp yeniden açılınca son çalışma kendiliğinden yüklenmez; geri yükleme önerilir. */
 function offerPreviousSessionRestore() {
     const stored = safeStorageGet(PREVIOUS_SESSION_KEY);
-    const bar = document.getElementById("restore-bar");
+    // On the welcome screen it is a card there; otherwise the bar at the bottom.
+    const bar = isWelcomeOpen() ? document.getElementById("welcome-restore") : document.getElementById("restore-bar");
     if (!stored || !bar) return;
 
     if (!storedWorkbookHasContent(stored)) {
@@ -8506,6 +8524,7 @@ function offerPreviousSessionRestore() {
     };
     bar.querySelector(".restore-bar-restore").onclick = () => {
         close();
+        hideWelcome();
         try {
             isLoadingWorkbook = true;
             loadWorkbookPayload(payload);
@@ -8529,6 +8548,122 @@ function storedWorkbookHasContent(text) {
     }
 }
 
+/* ---------- Giriş ekranı (awPDF'in ilk ekranı gibi; kullanıcı kararı 2026-11-18) ---------- */
+
+const WELCOME_KEY = "awcell.girisEkrani";
+const welcomeScreen = document.getElementById("welcome-screen");
+const welcomeBackBtn = document.getElementById("welcome-back");
+const welcomeAtStartInput = document.getElementById("welcome-at-start");
+/** A conversion chosen on the welcome screen: the next opened file is saved in this format. */
+let pendingConversion = null;
+
+function welcomeAtStart() {
+    return safeStorageGet(WELCOME_KEY) !== "kapali";
+}
+
+function isWelcomeOpen() {
+    return Boolean(welcomeScreen && !welcomeScreen.hidden);
+}
+
+/** Opened over a table (Dosya → Giriş ekranı): "Tabloya Dön" leads back to it. */
+function showWelcome(overTable) {
+    if (!welcomeScreen) return;
+    if (isEditing) exitEditMode(true);
+    welcomeBackBtn.hidden = !overTable;
+    welcomeAtStartInput.checked = welcomeAtStart();
+    welcomeScreen.hidden = false;
+    document.body.classList.add("welcome-open");
+    // The bar's offer moves onto the screen.
+    const bar = document.getElementById("restore-bar");
+    if (bar && !bar.hidden) {
+        bar.hidden = true;
+        offerPreviousSessionRestore();
+    }
+    document.getElementById("welcome-new")?.focus();
+}
+
+function hideWelcome() {
+    if (!isWelcomeOpen()) return;
+    welcomeScreen.hidden = true;
+    document.body.classList.remove("welcome-open");
+    // Work offered back but not answered yet is offered again on the bar, never lost.
+    const card = document.getElementById("welcome-restore");
+    if (card && !card.hidden) {
+        card.hidden = true;
+        offerPreviousSessionRestore();
+    }
+    focusSelectedCell();
+}
+
+/** The table saved in one format, as the conversions on the welcome screen do. */
+async function saveWorkbookAsFormat(extension) {
+    const fileName = `${getCurrentSaveBaseName()}.${extension}`;
+    const type = SAVE_AS_FILE_TYPES.find((item) => Object.values(item.accept).flat().includes(`.${extension}`));
+    try {
+        const blob = await createBlobForFileName(fileName, createSavePayload());
+        const saved = await writeSaveFile(blob, fileName, type ? [type] : SAVE_AS_FILE_TYPES);
+        showToast(`${saved.fileName} kaydedildi`);
+    } catch (error) {
+        if (error?.name !== "AbortError") showAppMessage("Dosya dönüştürülemedi.", "Dönüştürme hatası");
+    }
+}
+
+const CONVERSION_SOURCES = {
+    xlsx: { description: "Excel çalışma kitabı", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx", ".xlsm"] } },
+    csv: { description: "CSV dosyası", accept: { "text/csv": [".csv", ".tsv", ".txt"] } },
+    ods: { description: "LibreOffice Calc çalışma kitabı", accept: { "application/vnd.oasis.opendocument.spreadsheet": [".ods"] } }
+};
+
+/** A file is chosen and opened, then saved in `target` (awPDF's PDF → Word works the same way). */
+async function runConversion(source, target) {
+    pendingConversion = { extension: target, expires: Date.now() + 10 * 60 * 1000 };
+    try {
+        await openWorkbook([CONVERSION_SOURCES[source]]);
+    } catch (error) {
+        pendingConversion = null;
+        if (error?.name !== "AbortError") showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
+    }
+}
+
+// The file input (browsers without a file picker): a closed chooser cancels the conversion.
+openFileInput?.addEventListener("cancel", () => {
+    pendingConversion = null;
+});
+
+document.getElementById("welcome-new")?.addEventListener("click", () => {
+    void createNewWorkbook();
+});
+document.getElementById("welcome-open")?.addEventListener("click", () => {
+    pendingConversion = null;
+    void runOpenWorkbook();
+});
+document.getElementById("welcome-xlsx-pdf")?.addEventListener("click", () => void runConversion("xlsx", "pdf"));
+document.getElementById("welcome-csv-xlsx")?.addEventListener("click", () => void runConversion("csv", "xlsx"));
+document.getElementById("welcome-ods-xlsx")?.addEventListener("click", () => void runConversion("ods", "xlsx"));
+document.getElementById("welcome-xlsx-ods")?.addEventListener("click", () => void runConversion("xlsx", "ods"));
+welcomeBackBtn?.addEventListener("click", hideWelcome);
+welcomeAtStartInput?.addEventListener("change", () => {
+    safeStorageSet(WELCOME_KEY, welcomeAtStartInput.checked ? "acik" : "kapali");
+});
+document.getElementById("welcome-file-btn")?.addEventListener("click", () => {
+    hideFileMenu();
+    if (isWelcomeOpen()) hideWelcome();
+    else showWelcome(true);
+});
+
+// While the screen shows, keys and pastes do not reach the hidden table: only its own buttons
+// take them (Tab, Enter, Space work as on any page).
+window.addEventListener("keydown", (e) => {
+    if (!isWelcomeOpen() || appDialog?.open) return;
+    e.stopPropagation();
+    if (!welcomeScreen.contains(e.target) && e.key !== "Tab") e.preventDefault();
+}, true);
+window.addEventListener("paste", (e) => {
+    if (!isWelcomeOpen()) return;
+    e.stopPropagation();
+    e.preventDefault();
+}, true);
+
 // INIT
 applyViewSettings();
 const isReload = isPageReload();
@@ -8548,6 +8683,7 @@ if (!(isReload && loadAutoSavedWorkbook())) {
 isAppInitialized = true;
 scheduleAutoSave();
 focusSelectedCell();
+if (!isReload && welcomeAtStart()) showWelcome(false);
 if (!isReload) offerPreviousSessionRestore();
 
 function isCellInRange(row, col, range) {
@@ -9881,7 +10017,18 @@ function handleAndroidBack() {
         closeChartSettingsPanel();
         return true;
     }
-    return false;
+    // As in awPDF: the welcome screen opened over a table gives it back; then the table closes
+    // (asked about first when it has content) and the welcome screen comes; from the welcome
+    // screen the app goes behind the others.
+    if (isWelcomeOpen() && !welcomeBackBtn.hidden) {
+        hideWelcome();
+        return true;
+    }
+    if (isWelcomeOpen()) return false;
+    void createNewWorkbook().then((closed) => {
+        if (closed) showWelcome(false);
+    });
+    return true;
 }
 
 // Android'de dosya ekranları, "Birlikte aç", yazdırma ve geri tuşu (src/android.js).
