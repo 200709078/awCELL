@@ -8539,6 +8539,15 @@ function offerPreviousSessionRestore() {
         return;
     }
     const payload = JSON.parse(stored);
+    // Work that was saved (equal to the file last saved) is not lost: nothing to offer.
+    try {
+        if (fingerprintSavedBeforeStart && fingerprint(workbookSignature(payload)) === fingerprintSavedBeforeStart) {
+            safeStorageRemove(PREVIOUS_SESSION_KEY);
+            return;
+        }
+    } catch {
+        // An old or odd copy: offered as before.
+    }
 
     // The file's name says which work it is; a never-saved table is named by when it was last edited.
     const savedAt = payload.savedAt ? new Date(payload.savedAt) : null;
@@ -8591,8 +8600,7 @@ const CLEAN_KEY = "awcell.kayitliOzet";
  * What a save keeps, without what only moves on screen (the selection, the active sheet, the grid
  * growing as it is scrolled, the time): two tables with the same text here hold the same work.
  */
-function workbookSignature() {
-    const payload = createSavePayload();
+function workbookSignature(payload = createSavePayload()) {
     const trimDefaults = (sizes, size) => {
         const kept = [...sizes];
         while (kept.length && kept[kept.length - 1] === size) kept.pop();
@@ -8619,6 +8627,8 @@ function fingerprint(text) {
 }
 
 let cleanFingerprint = null;
+/** What was saved when the app was last closed: work equal to it is not offered back as unsaved. */
+const fingerprintSavedBeforeStart = safeStorageGet(CLEAN_KEY);
 
 /** The table as it is now counts as saved (after opening, saving or starting anew). */
 function markWorkbookClean() {
