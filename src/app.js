@@ -10072,6 +10072,10 @@ setupDesktop({
         } catch (error) {
             showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
         }
+    },
+    save: () => {
+        if (isEditing) exitEditMode(true);
+        return saveWorkbook();
     }
 });
 

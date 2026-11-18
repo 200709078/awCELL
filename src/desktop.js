@@ -168,10 +168,14 @@ function installFilePickers(files) {
  * Masaüstündeyse başlık çubuğunu ve dosya katmanını kurar. openFile(file, handle): uygulamanın
  * dosya açma işlevi ("Birlikte aç" ile gelen dosyalar için).
  */
-export function setupDesktop({ openFile }) {
+/** save(): resolves true once the table is saved; then the window closes ("Kaydet" when closing). */
+export function setupDesktop({ openFile, save }) {
     const desktop = getDesktop();
     if (!desktop) return false;
     mountTitleBar(desktop.windowControls);
+    desktop.windowControls.onSaveAndClose?.(async () => {
+        if (await save()) desktop.windowControls.close();
+    });
     installFilePickers(desktop.files);
     desktop.files.onOpened(async (opened) => {
         const handle = createHandle(desktop.files, opened);

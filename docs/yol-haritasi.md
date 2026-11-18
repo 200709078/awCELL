@@ -330,3 +330,8 @@ mı" diye değil, "tabloda bir şey var mı" diye. Otomatik kayıt da kısa sür
     gezinmek / kaydırmak değişiklik değil; yenileme sonrası bilinir; Yeni yalnız değişiklikte sorar.
   - Giriş ekranı denemeleri yeniden geçti.
   - Electron'da (geçici profille) kapatma sorusu, Vazgeç ve Kaydetmeden kapat denendi.
+- **Ek (2026-11-18, kullanıcı bildirdi: "seçenekler arasında kaydet yok"):** Masaüstünde kapatma sorusu artık
+  **Kaydet** / **Kaydetmeden kapat** / **Vazgeç**. Kaydet seçilince kabuk sayfaya "kaydet ve kapat" der
+  (`window:save-and-close`); sayfa kaydeder (yer sorulursa ve vazgeçilirse pencere açık kalır), sonra
+  pencereyi kapatır. Electron'da geçici profille denendi (Vazgeç pencereyi tutar; Kaydet `.awc`'yi yazar ve
+  kapatır). awDOC'ta da aynısı yapıldı.
