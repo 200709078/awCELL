@@ -10176,7 +10176,8 @@ setupDesktop({
         }
     },
     // Closing the window with unsaved changes: the same question as before Yeni or Aç.
-    confirmLeave: () => (appDialog?.open ? false : confirmLeaveWorkbook())
+    confirmLeave: () => (appDialog?.open ? false : confirmLeaveWorkbook()),
+    questionOpen: () => Boolean(appDialog?.open)
 });
 
 /** Android geri tuşu: açık olan bir şeyi kapatır; kapatacak bir şey yoksa false (uygulama arka plana geçer). */

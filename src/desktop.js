@@ -179,22 +179,34 @@ export async function reopenDesktopFile(key) {
  */
 /**
  * confirmLeave(): asked when the window is to close with unsaved changes (the page's own question,
- * Kaydet / Kaydetme / Vazgeç); true closes it.
+ * Kaydet / Kaydetme / Vazgeç); true closes it. questionOpen(): a question window is on screen now.
  */
-export function setupDesktop({ openFile, confirmLeave }) {
+export function setupDesktop({ openFile, confirmLeave, questionOpen }) {
     const desktop = getDesktop();
     if (!desktop) return false;
     mountTitleBar(desktop.windowControls);
     let asking = false;
-    desktop.windowControls.onCloseRequested?.(async () => {
-        if (asking) return;
+    // ✕ again just after an answer, before it was taken: asked again once that is done (awDOC's fix).
+    let askAgain = false;
+    const askToClose = async () => {
+        // Being asked now (a question is on screen): that answer decides.
+        if (questionOpen?.()) return;
+        if (asking) {
+            askAgain = true;
+            return;
+        }
         asking = true;
         try {
             if (await confirmLeave()) desktop.windowControls.closeNow?.();
         } finally {
             asking = false;
+            if (askAgain) {
+                askAgain = false;
+                void askToClose();
+            }
         }
-    });
+    };
+    desktop.windowControls.onCloseRequested?.(askToClose);
     installFilePickers(desktop.files);
     desktop.files.onOpened(async (opened) => {
         const handle = createHandle(desktop.files, opened);
