@@ -377,3 +377,18 @@ awCELLe son dosyalar gelsin" dedi.
 - **Temizlenecek:** Menülerin açma / kapatma kodu (`openTextMenu`, `hide*Menu`, `updateFormatMenuState`…) ve
   `.text-menu*` CSS'i artık hiç çalışmıyor. Öğeler olmadığı için sessizce geçiyor, zararsız; ayrı bir
   temizlik adımında silinebilir.
+
+## Sağ alttaki "mADEMatik Solutions" bağlantısı kalktı (2026-11-18, kullanıcı isteği)
+
+Kullanıcı: "awCELLde alttki madematik solutions bağlantısını da kaldır … bu bağlantı diğer uygulamalarda varsa
+onlardan da kaldıralım. sadece hakkında kısmında kalsın madematik solutions."
+- **Kaldırılan:** Sağ alttaki bağlantı ve sayfa sekmelerinin ona ayırdığı 170 piksellik boşluk. Marka yalnız
+  Hakkında penceresinde.
+- **Öbür uygulamalar:** drAW, drAW2D, drAW3D, awPDF ve awDOC'ta böyle bir bağlantı yoktu; marka yalnız
+  Hakkında'da.
+
+## Android: okunamayan dosya söylenir (2026-11-18)
+
+Telefon denemesinde görüldü: "Birlikte aç" ile gelen bir dosya okunamazsa (izin yok, dosya yok) yalnız günlüğe
+yazılıyordu. Artık "… açılamadı: dosyayı okuma izni yok ya da dosya bulunamadı." penceresi çıkıyor
+(`setupAndroid` → `onOpenError`). awDOC'ta da aynısı.

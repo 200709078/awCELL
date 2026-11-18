@@ -10228,7 +10228,8 @@ setupAndroid({
             showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
         }
     },
-    onBack: handleAndroidBack
+    onBack: handleAndroidBack,
+    onOpenError: (name) => showAppMessage(`"${name}" açılamadı: dosyayı okuma izni yok ya da dosya bulunamadı.`, "Dosya açılamadı")
 });
 
 // Çevrimdışı çalışma yalnız web sürümünde; Electron ve Android paketleri dosyaları zaten içinde taşır.

@@ -141,17 +141,22 @@ export async function printImagesOnAndroid(imageUrls, { landscape = false, title
  * Android'deyse dosya katmanını, "Birlikte aç"ı ve geri tuşunu kurar.
  * openFile(file, handle): uygulamanın açma işlevi; onBack(): bir şey kapattıysa true döner.
  */
-export function setupAndroid({ openFile, onBack }) {
+export function setupAndroid({ openFile, onBack, onOpenError }) {
     if (!isAndroidApp()) return false;
     document.body.classList.add("android-app");
     installFilePickers();
     void Native.addListener("fileOpened", async (file) => {
         const handle = createHandle(file);
+        let opened;
         try {
-            await openFile(await handle.getFile(), handle);
+            opened = await handle.getFile();
         } catch (error) {
+            // Okunamayan dosya (izin yok, dosya yok) söylenir; sessizce düşmez.
             console.error(error);
+            onOpenError?.(file.name);
+            return;
         }
+        await openFile(opened, handle);
     });
     void Native.addListener("backButton", () => {
         if (!onBack()) void Native.leaveApp();

@@ -1933,7 +1933,7 @@ td.editing::after {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 170px 0 10px;
+  padding: 0 10px;
   background: #f1f3f4;
   border-top: 1px solid var(--grid-border);
   overflow: hidden;
@@ -2006,27 +2006,6 @@ td.editing::after {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-#made-signature {
-  position: fixed;
-  right: 14px;
-  bottom: 8px;
-  z-index: 20;
-  color: #5f6368;
-  font: italic 600 13px "Segoe Script", "Bradley Hand ITC", "Comic Sans MS", cursive;
-  text-decoration: none;
-  letter-spacing: 0;
-  opacity: 0.72;
-}
-
-#made-signature:hover {
-  opacity: 1;
-  text-decoration: none;
-}
-
-#made-signature:hover .made-highlight {
-  color: var(--sheet-blue);
 }
 
 .status-summary-item {
