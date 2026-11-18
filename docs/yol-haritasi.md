@@ -405,3 +405,11 @@ Kullanıcı: "kaydedilmemiş değişiklikler var ekranı hepsinde farklı farkl�
 
 Kullanıcı: "değişen uygulamaların hepsini github a gönder, yeni versiyon yayınla, play consola da yeni sürümle yükle." GitHub sürümü v1.1.4 (apk, deb, AppImage, exe; imza 84:F7:8D:F0… denetlendi). Play için imzalı AAB ve sürüm notu `~/Belgeler/Play/awCELL/1.1.4/`; bu oturumda tarayıcı aracı olmadığı için Play Console'a yüklemeyi kullanıcı yapar. Site indirme kayıtları için SQL: `~/Masaüstü/madematik_indirmeler_2026-11-18.sql` (yerel veritabanında iki kez denendi). Web sürümü madematik.com'a bu yayınla yüklenmedi; kullanıcıya soruldu.
 
+## Yayın 1.1.5 (2026-11-18, kullanıcı isteği)
+
+Kullanıcı: "bütün değişiklikler bittikten sonra değişenlerin hepsini playde ve githubda yeni sürüme geçirelim." İçinde
+masaüstü düzeltmesi: Vazgeç'ten hemen sonra ✕ yeniden sorar (awDOC'taki düzeltme taşındı). GitHub sürümü v1.1.5; Play için
+imzalı AAB ve sürüm notu `~/Belgeler/Play/awCELL/1.1.5/` (aynı günün önceki sürümünün yerine yüklenir; tarayıcı aracı yoktu,
+yüklemeyi kullanıcı yapar). Site SQL'i: `~/Masaüstü/madematik_projelerim_2026-11-18.sql` (awDOC proje sayfası dahil,
+yerelde iki kez denendi). Web sürümü bu küçük masaüstü düzeltmesi için yeniden yüklenmedi.
+
