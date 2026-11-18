@@ -8252,7 +8252,7 @@ const appDialog = document.getElementById("app-dialog");
 // paketli uygulamanın güvenlik kuralı (CSP) satır içi olay kodunu çalıştırmaz.
 appDialog?.querySelector("form")?.addEventListener("submit", (e) => e.preventDefault());
 
-function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, extraText = null, danger = false } = {}) {
+function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, extraText = null, extraDanger = false, danger = false } = {}) {
     return new Promise((resolve) => {
         if (!appDialog) {
             resolve({ confirmed: true, value: input?.value ?? "" });
@@ -8277,6 +8277,7 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
         if (extraButton) {
             extraButton.textContent = extraText ?? "";
             extraButton.hidden = !extraText;
+            extraButton.classList.toggle("soft-danger", extraDanger);
         }
 
         let inputElement = null;
@@ -8654,6 +8655,7 @@ async function confirmLeaveWorkbook() {
         message: `"${name}" içinde kaydedilmemiş değişiklikler var.`,
         confirmText: "Kaydet",
         extraText: "Kaydetme",
+        extraDanger: true,
         cancelText: "Vazgeç"
     });
     if (result.extra) return true;
@@ -10173,10 +10175,8 @@ setupDesktop({
             showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
         }
     },
-    save: () => {
-        if (isEditing) exitEditMode(true);
-        return saveWorkbook();
-    }
+    // Closing the window with unsaved changes: the same question as before Yeni or Aç.
+    confirmLeave: () => (appDialog?.open ? false : confirmLeaveWorkbook())
 });
 
 /** Android geri tuşu: açık olan bir şeyi kapatır; kapatacak bir şey yoksa false (uygulama arka plana geçer). */

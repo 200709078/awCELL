@@ -2,7 +2,7 @@
 // (awcell://app/) yüklenir: file:// kullanılmaz, böylece sayfa diskteki dosyaları okuyamaz.
 // Pencere çerçevesizdir; başlık çubuğunu sayfa çizer (src/desktop.js), düğmeleri buradan çalışır.
 // Geliştirmede: AWCELL_DEV_SERVER_URL=http://127.0.0.1:4177 (npm run dev ile).
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, net, protocol, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DesktopFiles } from "./files.js";
@@ -48,6 +48,9 @@ function registerAppProtocol() {
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
 /** Sayfanın çizdiği başlık çubuğundaki pencere düğmeleri. */
+/** Windows whose page has answered its own question about unsaved changes. */
+const answeredClose = new WeakSet();
+
 function registerWindowControls() {
     ipcMain.on("window:minimize", (event) => senderWindow(event)?.minimize());
     ipcMain.on("window:toggle-maximize", (event) => {
@@ -62,6 +65,13 @@ function registerWindowControls() {
     });
     ipcMain.on("window:set-fullscreen", (event, enabled) => senderWindow(event)?.setFullScreen(enabled === true));
     ipcMain.on("window:close", (event) => senderWindow(event)?.close());
+    // The page has asked about unsaved changes itself (Kaydetme, or Kaydet done): it closes now.
+    ipcMain.on("window:close-now", (event) => {
+        const window = senderWindow(event);
+        if (!window) return;
+        answeredClose.add(window);
+        window.close();
+    });
     ipcMain.handle("window:is-maximized", (event) => senderWindow(event)?.isMaximized() ?? false);
     ipcMain.handle("window:is-fullscreen", (event) => senderWindow(event)?.isFullScreen() ?? false);
 }
@@ -89,20 +99,11 @@ async function createWindow() {
         }
     });
 
-    // Kaydedilmemiş değişiklikle kapatılırken sayfa çıkışı durdurur (beforeunload); burada sorulur (awDOC gibi).
+    // Kaydedilmemiş değişiklikle kapatılırken sayfa çıkışı durdurur (beforeunload). Sayfa kendi penceresiyle
+    // sorar (Yeni ve Aç'taki gibi; awDOC ve awPDF'te de aynı), sonra window:close-now ile kapatır.
     window.webContents.on("will-prevent-unload", (event) => {
-        const choice = dialog.showMessageBoxSync(window, {
-            type: "warning",
-            title: "awCELL",
-            message: "Kaydedilmemiş değişiklikler var.",
-            detail: "Kaydetmezseniz değişiklikler kaybolur.",
-            buttons: ["Kaydet", "Kaydetme", "Vazgeç"],
-            defaultId: 0,
-            cancelId: 2
-        });
-        // Kaydet: the page saves, then closes the window itself (a cancelled save keeps it open).
-        if (choice === 0) window.webContents.send("window:save-and-close");
-        if (choice === 1) event.preventDefault();
+        if (answeredClose.has(window)) event.preventDefault();
+        else window.webContents.send("window:close-requested");
     });
     window.on("maximize", () => window.webContents.send("window:maximize-changed", true));
     window.on("unmaximize", () => window.webContents.send("window:maximize-changed", false));

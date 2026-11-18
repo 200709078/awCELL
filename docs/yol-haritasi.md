@@ -392,3 +392,11 @@ onlardan da kaldıralım. sadece hakkında kısmında kalsın madematik solution
 Telefon denemesinde görüldü: "Birlikte aç" ile gelen bir dosya okunamazsa (izin yok, dosya yok) yalnız günlüğe
 yazılıyordu. Artık "… açılamadı: dosyayı okuma izni yok ya da dosya bulunamadı." penceresi çıkıyor
 (`setupAndroid` → `onOpenError`). awDOC'ta da aynısı.
+
+## Kaydedilmemiş değişiklikler penceresi her yerde aynı (2026-11-18, kullanıcı isteği)
+
+Kullanıcı: "kaydedilmemiş değişiklikler var ekranı hepsinde farklı farklı sanırım. bütün hepsinde awCELL deki gibi çıksın bu ekran", "sadece Kaydetme butonu hafif kırmızı olsun" (kırmızımsı). awCELL, awDOC ve awPDF'te uygulandı (drAW ailesinde bu pencere yok, otomatik kaydederler):
+
+- Pencere awCELL'deki gibi küçük ve sade: başlık "Kaydedilmemiş değişiklikler", ileti `"<ad>" içinde kaydedilmemiş değişiklikler var.`, tek satırda **Vazgeç · Kaydetme · Kaydet** (Kaydet uygulamanın ana rengiyle, Kaydetme açık kırmızı; telefonda da tek satır).
+- Masaüstünde (Electron) pencere kapatılırken artık sistemin kendi soru kutusu değil, uygulamanın bu penceresi çıkar (`will-prevent-unload` → `window:close-requested`; sayfa sorar, sonra `window:close-now`). awPDF'te kapanışta Kaydet seçeneği de böylece geldi; birden çok kaydedilmemiş sekme varsa her biri sırayla gösterilip sorulur.
+- Tarayıcıda sekme/pencere kapatılırken tarayıcının kendi uyarısı çıkar; o değiştirilemez.

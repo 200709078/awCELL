@@ -2219,6 +2219,13 @@ textarea.app-dialog-input {
   background: #c5221f;
 }
 
+/* Kaydetme (kaydedilmemiş değişiklikler): kırmızımsı, tehlike düğmesinden açık (kullanıcı isteği 2026-11-18). */
+.app-dialog-actions .app-dialog-extra.soft-danger {
+  border-color: #f3b8b4;
+  background: #fdecea;
+  color: #b3261e;
+}
+
 .app-dialog-actions button:hover {
   filter: brightness(0.96);
 }

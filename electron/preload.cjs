@@ -31,9 +31,10 @@ contextBridge.exposeInMainWorld("awCELLDesktop", {
         onFullscreenChanged: (callback) => {
             ipcRenderer.on("window:fullscreen-changed", (_event, fullscreen) => callback(fullscreen === true));
         },
-        /** "Kaydet" in the window's close question: save, then close. */
-        onSaveAndClose: (callback) => {
-            ipcRenderer.on("window:save-and-close", () => callback());
-        }
+        /** The window is to close with unsaved changes: the page asks, then calls closeNow. */
+        onCloseRequested: (callback) => {
+            ipcRenderer.on("window:close-requested", () => callback());
+        },
+        closeNow: () => ipcRenderer.send("window:close-now")
     }
 });

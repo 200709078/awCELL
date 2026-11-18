@@ -177,13 +177,23 @@ export async function reopenDesktopFile(key) {
  * Masaüstündeyse başlık çubuğunu ve dosya katmanını kurar. openFile(file, handle): uygulamanın
  * dosya açma işlevi ("Birlikte aç" ile gelen dosyalar için).
  */
-/** save(): resolves true once the table is saved; then the window closes ("Kaydet" when closing). */
-export function setupDesktop({ openFile, save }) {
+/**
+ * confirmLeave(): asked when the window is to close with unsaved changes (the page's own question,
+ * Kaydet / Kaydetme / Vazgeç); true closes it.
+ */
+export function setupDesktop({ openFile, confirmLeave }) {
     const desktop = getDesktop();
     if (!desktop) return false;
     mountTitleBar(desktop.windowControls);
-    desktop.windowControls.onSaveAndClose?.(async () => {
-        if (await save()) desktop.windowControls.close();
+    let asking = false;
+    desktop.windowControls.onCloseRequested?.(async () => {
+        if (asking) return;
+        asking = true;
+        try {
+            if (await confirmLeave()) desktop.windowControls.closeNow?.();
+        } finally {
+            asking = false;
+        }
     });
     installFilePickers(desktop.files);
     desktop.files.onOpened(async (opened) => {
