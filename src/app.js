@@ -4181,13 +4181,8 @@ function clearCurrentWorkbookFile() {
 }
 
 async function createNewWorkbook() {
-    const hasContent = sheets.length > 1 || !isSheetEmpty(createSheetState(sheets[activeSheetIndex]?.name ?? "Sayfa1"));
-    if (hasContent && !(await showAppConfirm("Açık çalışma kapatılıp boş bir dosya açılsın mı? Kaydedilmemiş değişiklikler kaybolur.", {
-        confirmText: "Yeni dosya",
-        danger: true
-    }))) {
-        return false;
-    }
+    // Only unsaved changes are asked about (a saved table, or an empty one, gives way at once).
+    if (!(await confirmLeaveWorkbook())) return false;
     if (isEditing) exitEditMode(false);
 
     isLoadingWorkbook = true;
@@ -4228,6 +4223,7 @@ async function createNewWorkbook() {
     focusSelectedCell();
     isLoadingWorkbook = false;
     saveAutoSavedWorkbook();
+    markWorkbookClean();
     hideWelcome();
     return true;
 }
@@ -4616,8 +4612,14 @@ function createImportedPayload(result) {
  * desktop and Android): the welcome screen closes, and a conversion chosen there is saved.
  */
 async function openWorkbookFile(file, handle = null) {
+    if (!file) return false;
+    if (!(await confirmLeaveWorkbook())) {
+        pendingConversion = null;
+        return false;
+    }
     const opened = await loadWorkbookFromFile(file, handle);
     if (!opened) return false;
+    markWorkbookClean();
     hideWelcome();
     const conversion = pendingConversion;
     pendingConversion = null;
@@ -4798,6 +4800,7 @@ async function writeSaveAsFile(defaultName) {
         fileName = handle.name || fileName;
         updateNextSaveNumber(fileName);
         setCurrentWorkbookFile(fileName, getFileExtension(fileName) === "awc" ? handle : null);
+        if (keepsWholeWorkbook(fileName)) markWorkbookClean();
         return true;
     }
 
@@ -4820,7 +4823,13 @@ async function writeSaveAsFile(defaultName) {
     downloadSaveFile(blob, fileName);
     updateNextSaveNumber(fileName);
     setCurrentWorkbookFile(fileName);
+    if (keepsWholeWorkbook(fileName)) markWorkbookClean();
     return true;
+}
+
+/** A PDF or a CSV (one sheet) is an export: the work is not saved by it. */
+function keepsWholeWorkbook(fileName) {
+    return ["awc", "xlsx", "ods", "xls"].includes(getFileExtension(fileName));
 }
 
 async function saveWorkbook() {
@@ -4831,6 +4840,7 @@ async function saveWorkbook() {
             await writable.write(blob);
             await writable.close();
             updateNextSaveNumber(currentWorkbookFileName);
+            markWorkbookClean();
             showToast("Kaydedildi");
             return true;
         }
@@ -4855,6 +4865,7 @@ async function saveWorkbook() {
         const saved = await writeSaveFile(blob, fileName);
         setCurrentWorkbookFile(saved.fileName, saved.handle);
         updateNextSaveNumber(saved.fileName);
+        markWorkbookClean();
         return true;
     } catch (error) {
         if (error?.name !== "AbortError") {
@@ -7726,12 +7737,14 @@ window.addEventListener("resize", () => {
         .forEach(positionMinimizedChartWindow);
 });
 
-window.addEventListener("beforeunload", () => {
+window.addEventListener("beforeunload", (event) => {
     if (isEditing) {
         exitEditMode(true);
     }
     window.clearTimeout(autoSaveTimer);
     saveAutoSavedWorkbook();
+    // The browser asks before leaving; the desktop app asks in its own window (electron/main.js).
+    if (isWorkbookDirty()) event.preventDefault();
 });
 
 contextMenu?.addEventListener("click", (e) => {
@@ -8226,7 +8239,7 @@ const appDialog = document.getElementById("app-dialog");
 // paketli uygulamanın güvenlik kuralı (CSP) satır içi olay kodunu çalıştırmaz.
 appDialog?.querySelector("form")?.addEventListener("submit", (e) => e.preventDefault());
 
-function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, danger = false } = {}) {
+function showAppDialog({ title = "awCELL", message = "", input = null, select = null, confirmText = "Tamam", cancelText = null, extraText = null, danger = false } = {}) {
     return new Promise((resolve) => {
         if (!appDialog) {
             resolve({ confirmed: true, value: input?.value ?? "" });
@@ -8238,6 +8251,7 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
         const fieldsElement = appDialog.querySelector(".app-dialog-fields");
         const confirmButton = appDialog.querySelector(".app-dialog-confirm");
         const cancelButton = appDialog.querySelector(".app-dialog-cancel");
+        const extraButton = appDialog.querySelector(".app-dialog-extra");
 
         titleElement.textContent = title;
         messageElement.textContent = message;
@@ -8247,6 +8261,10 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
         confirmButton.classList.toggle("danger", danger);
         cancelButton.textContent = cancelText ?? "";
         cancelButton.hidden = !cancelText;
+        if (extraButton) {
+            extraButton.textContent = extraText ?? "";
+            extraButton.hidden = !extraText;
+        }
 
         let inputElement = null;
         let selectElement = null;
@@ -8272,14 +8290,16 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
             fieldsElement.appendChild(selectElement);
         }
 
-        const finish = (confirmed) => {
+        const finish = (confirmed, extra = false) => {
             appDialog.removeEventListener("close", onClose);
             confirmButton.removeEventListener("click", onConfirm);
             cancelButton.removeEventListener("click", onCancel);
+            extraButton?.removeEventListener("click", onExtra);
             appDialog.removeEventListener("keydown", onKeydown);
             if (appDialog.open) appDialog.close();
             resolve({
                 confirmed,
+                extra,
                 value: inputElement?.value ?? "",
                 selected: selectElement?.value ?? null
             });
@@ -8287,6 +8307,7 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
         };
         const onConfirm = () => finish(true);
         const onCancel = () => finish(false);
+        const onExtra = () => finish(false, true);
         const onClose = () => finish(false);
         const onKeydown = (event) => {
             event.stopPropagation();
@@ -8298,6 +8319,7 @@ function showAppDialog({ title = "awCELL", message = "", input = null, select = 
 
         confirmButton.addEventListener("click", onConfirm);
         cancelButton.addEventListener("click", onCancel);
+        extraButton?.addEventListener("click", onExtra);
         appDialog.addEventListener("close", onClose);
         appDialog.addEventListener("keydown", onKeydown);
         appDialog.showModal();
@@ -8548,6 +8570,74 @@ function storedWorkbookHasContent(text) {
     }
 }
 
+/* ---------- Kaydedilmemiş değişiklikler (awDOC'taki gibi; kullanıcı isteği 2026-11-18) ---------- */
+
+const CLEAN_KEY = "awcell.kayitliOzet";
+
+/**
+ * What a save keeps, without what only moves on screen (the selection, the active sheet, the grid
+ * growing as it is scrolled, the time): two tables with the same text here hold the same work.
+ */
+function workbookSignature() {
+    const payload = createSavePayload();
+    const trimDefaults = (sizes, size) => {
+        const kept = [...sizes];
+        while (kept.length && kept[kept.length - 1] === size) kept.pop();
+        return kept;
+    };
+    return JSON.stringify(payload.sheets.map((sheet) => [
+        sheet.name,
+        sheet.tableData,
+        trimDefaults(sheet.colWidths, DEFAULT_COL_WIDTH),
+        trimDefaults(sheet.rowHeights, DEFAULT_ROW_HEIGHT),
+        sheet.hiddenRows, sheet.hiddenCols, sheet.frozenRows, sheet.frozenCols,
+        sheet.activeFilter, sheet.charts
+    ]));
+}
+
+/** A short fingerprint (FNV-1a), kept on the device so a reload still knows what was saved. */
+function fingerprint(text) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return `${text.length}:${(hash >>> 0).toString(16)}`;
+}
+
+let cleanFingerprint = null;
+
+/** The table as it is now counts as saved (after opening, saving or starting anew). */
+function markWorkbookClean() {
+    cleanFingerprint = fingerprint(workbookSignature());
+    safeStorageSet(CLEAN_KEY, cleanFingerprint);
+}
+
+function isWorkbookDirty() {
+    if (cleanFingerprint === null) return false;
+    return fingerprint(workbookSignature()) !== cleanFingerprint;
+}
+
+/**
+ * Before the table on screen gives way (another file, a new one, closing): with unsaved changes,
+ * Kaydet / Kaydetmeden devam et / Vazgeç, as in awDOC. Resolves false when the user stays.
+ */
+async function confirmLeaveWorkbook() {
+    if (isEditing) exitEditMode(true);
+    if (!isWorkbookDirty()) return true;
+    const name = currentWorkbookFileName || (importedFileBaseName ? `${importedFileBaseName}` : "Tablo");
+    const result = await showAppDialog({
+        title: "Kaydedilmemiş değişiklikler",
+        message: `"${name}" içinde kaydedilmemiş değişiklikler var.`,
+        confirmText: "Kaydet",
+        extraText: "Kaydetmeden devam et",
+        cancelText: "Vazgeç"
+    });
+    if (result.extra) return true;
+    if (!result.confirmed) return false;
+    return saveWorkbook();
+}
+
 /* ---------- Giriş ekranı (awPDF'in ilk ekranı gibi; kullanıcı kararı 2026-11-18) ---------- */
 
 const WELCOME_KEY = "awcell.girisEkrani";
@@ -8602,6 +8692,7 @@ async function saveWorkbookAsFormat(extension) {
     try {
         const blob = await createBlobForFileName(fileName, createSavePayload());
         const saved = await writeSaveFile(blob, fileName, type ? [type] : SAVE_AS_FILE_TYPES);
+        if (keepsWholeWorkbook(saved.fileName)) markWorkbookClean();
         showToast(`${saved.fileName} kaydedildi`);
     } catch (error) {
         if (error?.name !== "AbortError") showAppMessage("Dosya dönüştürülemedi.", "Dönüştürme hatası");
@@ -8683,6 +8774,8 @@ if (!(isReload && loadAutoSavedWorkbook())) {
 isAppInitialized = true;
 scheduleAutoSave();
 focusSelectedCell();
+if (isReload && safeStorageGet(CLEAN_KEY)) cleanFingerprint = safeStorageGet(CLEAN_KEY);
+else markWorkbookClean();
 if (!isReload && welcomeAtStart()) showWelcome(false);
 if (!isReload) offerPreviousSessionRestore();
 

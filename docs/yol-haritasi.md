@@ -304,3 +304,29 @@ awPDF'te bu ekran şöyle: ortada yalnız logo (ad yazısı yok), altında ana i
       sızmaması, Tabloya Dön, kurtarma kartı, CSV → Excel ve Excel → PDF.
     - Android geri tuşu, köprü taklidiyle denendi.
     - Telefonda ve Electron'da denenmedi (kullanıcı: telefon denemesi sonra hepsi için).
+
+## Kaydedilmemiş değişiklik uyarısı (2026-11-18, kullanıcı isteği: "tamam bunu düzelt"; uygulandı)
+
+**Sorun:** Kullanıcı awPDF'in sekmeli açtığını, awCELL ve awDOC'un tek belgeyle açtığını sordu. Denetimde
+awCELL'in başka bir dosya açarken kaydedilmemiş değişikliği hiç sormadığı görüldü: yazılan iş uyarısız
+gidiyordu (Aç, giriş ekranı, "Birlikte aç", pencereyi kapatma). Yalnız "Yeni" soruyordu; o da "değişiklik var
+mı" diye değil, "tabloda bir şey var mı" diye. Otomatik kayıt da kısa sürede açılan dosyayla değişiyordu.
+
+**Düzeltme (awDOC'taki gibi):**
+- Kaydedilen ya da açılan hâlin özeti tutulur. Özetin içinde metin, biçim, sütun genişliği, satır yüksekliği,
+  gizleme, dondurma, süzgeç, grafikler ve sayfa adları var. Seçim, etkin sayfa, kaydırma ve tablonun
+  kaydırdıkça büyümesi değişiklik sayılmaz.
+- Özet cihazda saklanır (`awcell.kayitliOzet`); sayfa yenilenince değişikliğin kaydedilmediği bilinir.
+- **Ne zaman sorulur:** Dosya açmadan önce (her yoldan), Yeni'den önce, giriş ekranından ve Android geri
+  tuşuyla tablo kapanırken.
+- **Seçenekler:** "Kaydet" (önce kaydeder) / "Kaydetmeden devam et" / "Vazgeç". Uygulamanın penceresine
+  isteğe bağlı üçüncü düğme eklendi.
+- **Pencereyi kapatma:** Masaüstünde "Kaydedilmemiş değişiklikler var — Kaydetmeden kapat / Vazgeç" sorulur.
+  Tarayıcıda tarayıcının kendi sorusu çıkar.
+- **Ne kaydetmiş sayılır:** `.awc`, `.xlsx`, `.ods`, `.xls`. PDF ve CSV (tek sayfa) dışa aktarma sayılır,
+  değişikliği kaydedilmiş saymaz.
+- **Denemeler:**
+  - Chromium'da: boş tabloda soru yok; Vazgeç tabloyu korur; Kaydetmeden devam et açar; Kaydet önce kaydeder;
+    gezinmek / kaydırmak değişiklik değil; yenileme sonrası bilinir; Yeni yalnız değişiklikte sorar.
+  - Giriş ekranı denemeleri yeniden geçti.
+  - Electron'da (geçici profille) kapatma sorusu, Vazgeç ve Kaydetmeden kapat denendi.

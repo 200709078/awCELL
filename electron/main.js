@@ -2,7 +2,7 @@
 // (awcell://app/) yüklenir: file:// kullanılmaz, böylece sayfa diskteki dosyaları okuyamaz.
 // Pencere çerçevesizdir; başlık çubuğunu sayfa çizer (src/desktop.js), düğmeleri buradan çalışır.
 // Geliştirmede: AWCELL_DEV_SERVER_URL=http://127.0.0.1:4177 (npm run dev ile).
-import { app, BrowserWindow, ipcMain, Menu, net, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DesktopFiles } from "./files.js";
@@ -89,6 +89,19 @@ async function createWindow() {
         }
     });
 
+    // Kaydedilmemiş değişiklikle kapatılırken sayfa çıkışı durdurur (beforeunload); burada sorulur (awDOC gibi).
+    window.webContents.on("will-prevent-unload", (event) => {
+        const choice = dialog.showMessageBoxSync(window, {
+            type: "warning",
+            title: "awCELL",
+            message: "Kaydedilmemiş değişiklikler var.",
+            detail: "Kapatırsanız değişiklikler kaybolur.",
+            buttons: ["Kaydetmeden kapat", "Vazgeç"],
+            defaultId: 1,
+            cancelId: 1
+        });
+        if (choice === 0) event.preventDefault();
+    });
     window.on("maximize", () => window.webContents.send("window:maximize-changed", true));
     window.on("unmaximize", () => window.webContents.send("window:maximize-changed", false));
     window.on("enter-full-screen", () => window.webContents.send("window:fullscreen-changed", true));
