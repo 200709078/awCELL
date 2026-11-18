@@ -95,8 +95,8 @@ async function createWindow() {
             type: "warning",
             title: "awCELL",
             message: "Kaydedilmemiş değişiklikler var.",
-            detail: "Kaydetmeden kapatırsanız değişiklikler kaybolur.",
-            buttons: ["Kaydet", "Kaydetmeden kapat", "Vazgeç"],
+            detail: "Kaydetmezseniz değişiklikler kaybolur.",
+            buttons: ["Kaydet", "Kaydetme", "Vazgeç"],
             defaultId: 0,
             cancelId: 2
         });

@@ -8633,7 +8633,7 @@ function isWorkbookDirty() {
 
 /**
  * Before the table on screen gives way (another file, a new one, closing): with unsaved changes,
- * Kaydet / Kaydetmeden devam et / Vazgeç, as in awDOC. Resolves false when the user stays.
+ * Kaydet / Kaydetme / Vazgeç, as in awDOC. Resolves false when the user stays.
  */
 async function confirmLeaveWorkbook() {
     if (isEditing) exitEditMode(true);
@@ -8643,7 +8643,7 @@ async function confirmLeaveWorkbook() {
         title: "Kaydedilmemiş değişiklikler",
         message: `"${name}" içinde kaydedilmemiş değişiklikler var.`,
         confirmText: "Kaydet",
-        extraText: "Kaydetmeden devam et",
+        extraText: "Kaydetme",
         cancelText: "Vazgeç"
     });
     if (result.extra) return true;
