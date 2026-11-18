@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.UriPermission;
 import android.database.Cursor;
 import android.net.Uri;
 import android.print.PrintAttributes;
@@ -81,7 +82,36 @@ public class AwCellNativePlugin extends Plugin {
         file.put("id", id);
         file.put("name", displayName(uri));
         file.put("writable", writable);
+        // Son dosyalar: izin kalıcı alınabildiyse adres sayfaya gider; liste onunla yeniden açar.
+        if (keepAccess(uri, writable)) file.put("source", uri.toString());
         return file;
+    }
+
+    /**
+     * Dosyaya sonra da (uygulama kapanıp açılınca) erişme hakkını saklar. Seçiciden ve "kaydet"
+     * ekranından gelen dosyalar buna izin verir; "Birlikte aç" çoğu zaman vermez.
+     */
+    private boolean keepAccess(Uri uri, boolean writable) {
+        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | (writable ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0);
+        try {
+            getContext().getContentResolver().takePersistableUriPermission(uri, flags);
+            return true;
+        } catch (SecurityException refused) {
+            return false;
+        }
+    }
+
+    /** Son dosyalardan yeniden açma: izin hâlâ duruyorsa dosya yeni bir numarayla verilir. */
+    @PluginMethod
+    public void reopenFile(PluginCall call) {
+        Uri uri = Uri.parse(call.getString("source", ""));
+        for (UriPermission permission : getContext().getContentResolver().getPersistedUriPermissions()) {
+            if (permission.getUri().equals(uri) && permission.isReadPermission()) {
+                call.resolve(register(uri, permission.isWritePermission()));
+                return;
+            }
+        }
+        call.resolve(new JSObject());
     }
 
     @PluginMethod
@@ -90,7 +120,8 @@ public class AwCellNativePlugin extends Plugin {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         // .awc'nin Android'de türü yok; her şey gösterilir, uygulama açamadığını söyler.
         intent.setType("*/*");
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(call, intent, "filePicked");
     }
 

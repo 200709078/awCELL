@@ -9,6 +9,7 @@ import AwFileIO from "./fileio.js";
 import AwFormula from "./formula.js";
 import { isDesktopApp, setupDesktop } from "./desktop.js";
 import { isAndroidApp, printImagesOnAndroid, setupAndroid } from "./android.js";
+import { clearRecentFiles, forgetRecentFile, listRecentFiles, rememberRecentFile, reopenRecentFile } from "./recent.js";
 // Butonlar sığmazsa alt satıra geçilsin.
 
 const table = document.getElementById("data-table");
@@ -700,7 +701,9 @@ function updateViewMenuState(settings = loadViewSettings()) {
 }
 
 function applyViewSettings(settings = loadViewSettings(), shouldSave = false) {
-    document.body.classList.toggle("toolbar-hidden", !settings.toolbar);
+    // The toolbar always shows: with the text menus gone (2026-11-18) nothing could bring it back.
+    settings.toolbar = true;
+    document.body.classList.toggle("toolbar-hidden", false);
     document.body.classList.toggle("formula-hidden", !settings.formulaBar);
     document.body.classList.toggle("gridlines-hidden", !settings.gridlines);
     settings.zoom = normalizeZoom(settings.zoom);
@@ -4620,6 +4623,7 @@ async function openWorkbookFile(file, handle = null) {
     const opened = await loadWorkbookFromFile(file, handle);
     if (!opened) return false;
     markWorkbookClean();
+    if (handle) void rememberRecentFile(file.name, handle);
     hideWelcome();
     const conversion = pendingConversion;
     pendingConversion = null;
@@ -4800,7 +4804,10 @@ async function writeSaveAsFile(defaultName) {
         fileName = handle.name || fileName;
         updateNextSaveNumber(fileName);
         setCurrentWorkbookFile(fileName, getFileExtension(fileName) === "awc" ? handle : null);
-        if (keepsWholeWorkbook(fileName)) markWorkbookClean();
+        if (keepsWholeWorkbook(fileName)) {
+            markWorkbookClean();
+            void rememberRecentFile(fileName, handle);
+        }
         return true;
     }
 
@@ -4866,6 +4873,7 @@ async function saveWorkbook() {
         setCurrentWorkbookFile(saved.fileName, saved.handle);
         updateNextSaveNumber(saved.fileName);
         markWorkbookClean();
+        if (saved.handle) void rememberRecentFile(saved.fileName, saved.handle);
         return true;
     } catch (error) {
         if (error?.name !== "AbortError") {
@@ -6136,11 +6144,11 @@ function closeToolbarPopups() {
 function fitToolbar() {
     if (!toolbarRow || !toolbarOverflow || !toolbarMenu || !toolbarMenuBtn) return;
     const placementBefore = toolbarItems.map(isInToolbarMenu).join();
-    toolbarMenuBtn.hidden = true;
+    // The menu always has its fixed end (Giriş ekranı, Formüller, Klavye kısayolları, Hakkında).
+    toolbarMenuBtn.hidden = false;
     toolbarItems.forEach((item) => toolbarOverflow.before(item));
     const overflows = () => toolbarRow.scrollWidth > toolbarRow.clientWidth + 1;
     if (overflows()) {
-        toolbarMenuBtn.hidden = false;
         for (let index = toolbarItems.length - 1; index >= 0 && overflows(); index--) {
             toolbarMenu.prepend(toolbarItems[index]);
         }
@@ -6149,8 +6157,7 @@ function fitToolbar() {
         closeToolbarPopups();
         return;
     }
-    if (!toolbarMenuBtn.hidden) positionToolbarMenu();
-    else setToolbarMenuOpen(false);
+    positionToolbarMenu();
     toolbarGroups.forEach((group) => {
         if (!getToolbarGroupParts(group).panel?.hidden) positionToolbarPanel(group);
     });
@@ -6298,6 +6305,12 @@ function setupToolbarGroups() {
     // ☰ menüsündeki tek düğmeler (Grafik, Birleştir…) işini yapınca menüyü kapatır. Grup başlıkları
     // ve grupların içi kendi kuralına uyar; Yakınlaştırma kendi listesini açtığı için menüyü kapatmaz.
     toolbarMenu?.addEventListener("click", (e) => {
+        const help = e.target.closest("[data-help-action]");
+        if (help) {
+            if (help.dataset.helpAction === "functions") showFunctionHelp();
+            if (help.dataset.helpAction === "shortcuts") showShortcutHelp();
+            if (help.dataset.helpAction === "about") showAbout();
+        }
         const action = e.target.closest("button");
         if (!action || action.disabled || action.closest(".tb-group") || action === zoomValueBtn) return;
         setToolbarMenuOpen(false);
@@ -8655,7 +8668,7 @@ function isWelcomeOpen() {
     return Boolean(welcomeScreen && !welcomeScreen.hidden);
 }
 
-/** Opened over a table (Dosya → Giriş ekranı): "Tabloya Dön" leads back to it. */
+/** Opened over a table (☰ → Giriş ekranı): "Tabloya Dön" leads back to it. */
 function showWelcome(overTable) {
     if (!welcomeScreen) return;
     if (isEditing) exitEditMode(true);
@@ -8663,19 +8676,79 @@ function showWelcome(overTable) {
     welcomeAtStartInput.checked = welcomeAtStart();
     welcomeScreen.hidden = false;
     document.body.classList.add("welcome-open");
+    setToolbarRestingForWelcome(true);
+    if (findPanel && !findPanel.hidden) closeFindPanel();
     // The bar's offer moves onto the screen.
     const bar = document.getElementById("restore-bar");
     if (bar && !bar.hidden) {
         bar.hidden = true;
         offerPreviousSessionRestore();
     }
+    void drawRecentFiles();
     document.getElementById("welcome-new")?.focus();
+}
+
+const RECENT_DATE = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+
+/** Son Dosyalar on the welcome screen: a tap opens the file again (asking first about unsaved changes). */
+async function drawRecentFiles() {
+    const box = document.getElementById("welcome-recent");
+    const list = document.getElementById("welcome-recent-list");
+    if (!box || !list) return;
+    const entries = await listRecentFiles();
+    box.hidden = entries.length === 0;
+    list.replaceChildren(...entries.map((entry) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "welcome-recent-item";
+        const name = document.createElement("span");
+        name.className = "welcome-recent-name";
+        name.textContent = entry.name;
+        const date = document.createElement("span");
+        date.className = "welcome-recent-date";
+        date.textContent = RECENT_DATE.format(entry.usedAt);
+        item.append(name, date);
+        item.addEventListener("click", () => void openRecentFile(entry));
+        return item;
+    }));
+}
+
+async function openRecentFile(entry) {
+    let reopened = null;
+    try {
+        reopened = await reopenRecentFile(entry);
+    } catch (error) {
+        console.error(error);
+    }
+    if (!reopened) {
+        showAppMessage(`"${entry.name}" bulunamadı ya da açma izni yok; listeden çıkarıldı.`, "Dosya açılamadı");
+        await forgetRecentFile(entry.key);
+        void drawRecentFiles();
+        return;
+    }
+    try {
+        await openWorkbookFile(reopened.file, reopened.handle);
+    } catch (error) {
+        showAppMessage(error?.message || "Dosya açılamadı.", "Dosya açılamadı");
+    }
+}
+
+/**
+ * As in awPDF: on the welcome screen the toolbar shows, but what needs a table rests (inert, dimmed);
+ * Yeni, Aç and the ☰ menu (Giriş ekranı, help) stay.
+ */
+function setToolbarRestingForWelcome(resting) {
+    document.querySelectorAll("#control-panel .tb-item").forEach((item) => {
+        item.inert = resting && !item.closest("[data-tb-welcome]");
+    });
+    if (resting) closeToolbarPopups();
 }
 
 function hideWelcome() {
     if (!isWelcomeOpen()) return;
     welcomeScreen.hidden = true;
     document.body.classList.remove("welcome-open");
+    setToolbarRestingForWelcome(false);
     // Work offered back but not answered yet is offered again on the bar, never lost.
     const card = document.getElementById("welcome-restore");
     if (card && !card.hidden) {
@@ -8692,7 +8765,10 @@ async function saveWorkbookAsFormat(extension) {
     try {
         const blob = await createBlobForFileName(fileName, createSavePayload());
         const saved = await writeSaveFile(blob, fileName, type ? [type] : SAVE_AS_FILE_TYPES);
-        if (keepsWholeWorkbook(saved.fileName)) markWorkbookClean();
+        if (keepsWholeWorkbook(saved.fileName)) {
+            markWorkbookClean();
+            if (saved.handle) void rememberRecentFile(saved.fileName, saved.handle);
+        }
         showToast(`${saved.fileName} kaydedildi`);
     } catch (error) {
         if (error?.name !== "AbortError") showAppMessage("Dosya dönüştürülemedi.", "Dönüştürme hatası");
@@ -8733,6 +8809,9 @@ document.getElementById("welcome-csv-xlsx")?.addEventListener("click", () => voi
 document.getElementById("welcome-ods-xlsx")?.addEventListener("click", () => void runConversion("ods", "xlsx"));
 document.getElementById("welcome-xlsx-ods")?.addEventListener("click", () => void runConversion("xlsx", "ods"));
 welcomeBackBtn?.addEventListener("click", hideWelcome);
+document.getElementById("welcome-recent-clear")?.addEventListener("click", () => {
+    void clearRecentFiles().then(drawRecentFiles);
+});
 welcomeAtStartInput?.addEventListener("change", () => {
     safeStorageSet(WELCOME_KEY, welcomeAtStartInput.checked ? "acik" : "kapali");
 });
@@ -8746,8 +8825,19 @@ document.getElementById("welcome-file-btn")?.addEventListener("click", () => {
 // take them (Tab, Enter, Space work as on any page).
 window.addEventListener("keydown", (e) => {
     if (!isWelcomeOpen() || appDialog?.open) return;
+    // Ctrl+O (open) and Ctrl+N (new) work here as in awPDF; nothing else reaches the table.
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey && !e.shiftKey && (e.code === "KeyO" || e.code === "KeyN")) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.code === "KeyO") void runOpenWorkbook();
+        else void createNewWorkbook();
+        return;
+    }
     e.stopPropagation();
-    if (!welcomeScreen.contains(e.target) && e.key !== "Tab") e.preventDefault();
+    // The screen's own buttons and the toolbar's work as on any page (Tab, Enter, Space).
+    const own = welcomeScreen.contains(e.target) || document.getElementById("top-bar")?.contains(e.target);
+    if (!own && e.key !== "Tab") e.preventDefault();
 }, true);
 window.addEventListener("paste", (e) => {
     if (!isWelcomeOpen()) return;

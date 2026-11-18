@@ -132,6 +132,8 @@ function createHandle(files, { id, name }) {
     return {
         kind: "file",
         name,
+        /** Son dosyalar için saklanacak kalıcı anahtar. */
+        awcellSource: () => files.source(id),
         async getFile() {
             const bytes = await files.read(id);
             return new File([bytes], name);
@@ -162,6 +164,13 @@ function installFilePickers(files) {
         if (!file) throw abortError();
         return createHandle(files, file);
     };
+}
+
+/** Son dosyalardan yeniden açma; dosya yoksa null. */
+export async function reopenDesktopFile(key) {
+    const desktop = getDesktop();
+    const opened = await desktop?.files.reopen?.(key);
+    return opened ? createHandle(desktop.files, opened) : null;
 }
 
 /**

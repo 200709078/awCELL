@@ -18,387 +18,6 @@
 <body>
     <main id="app-shell">
         <header id="top-bar">
-            <h1 class="app-logo">
-                <img src="/icons/logo.svg" alt="awCELL" />
-            </h1>
-            <section id="menu-bar" aria-label="Ana menü">
-                <nav class="text-menu">
-                    <div class="menu-shell">
-                        <button id="file-menu-btn" type="button">Dosya</button>
-                        <div id="file-menu" class="text-menu-popover" hidden>
-                            <button id="welcome-file-btn" type="button">
-                                <img src="/icons/app-icon.svg" alt="" />
-                                <span>Giriş ekranı</span>
-                            </button>
-                            <hr>
-                            <button id="new-file-btn" type="button">
-                                <img src="/icons/new.svg" alt="" />
-                                <span>Yeni</span>
-                            </button>
-                            <button id="open-file-btn" type="button">
-                                <img src="/icons/open.svg" alt="" />
-                                <span>Aç</span>
-                            </button>
-                            <hr>
-                            <button id="save-file-btn" type="button">
-                                <img src="/icons/save.svg" alt="" />
-                                <span>Kaydet</span>
-                            </button>
-                            <button id="save-as-file-btn" type="button">
-                                <img src="/icons/save-as.svg" alt="" />
-                                <span>Farklı kaydet / Dışa aktar</span>
-                            </button>
-                            <hr>
-                            <button id="print-file-btn" type="button">
-                                <img src="/icons/print.svg" alt="" />
-                                <span>Yazdır</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="edit-menu-btn" type="button">Düzenle</button>
-                        <div id="edit-menu" class="text-menu-popover" hidden>
-                            <button id="menu-undo-btn" type="button">
-                                <img src="/icons/undo.svg" alt="" />
-                                <span>Geri Al</span>
-                            </button>
-                            <button id="menu-redo-btn" type="button">
-                                <img src="/icons/redo.svg" alt="" />
-                                <span>Yinele</span>
-                            </button>
-                            <hr>
-                            <button id="menu-cut-btn" type="button">
-                                <img src="/icons/cut.svg" alt="" />
-                                <span>Kes</span>
-                            </button>
-                            <button id="menu-copy-btn" type="button">
-                                <img src="/icons/copy.svg" alt="" />
-                                <span>Kopyala</span>
-                            </button>
-                            <button id="menu-paste-btn" type="button">
-                                <img src="/icons/paste.svg" alt="" />
-                                <span>Yapıştır</span>
-                            </button>
-                            <hr>
-                            <div class="format-submenu-shell">
-                                <button id="menu-delete-btn" type="button">
-                                    <img src="/icons/trash.svg" alt="" />
-                                    <span>Sil</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-delete-action="row">
-                                        <img src="/icons/delrow.svg" alt="" />
-                                        <span>Satır sil</span>
-                                    </button>
-                                    <button type="button" data-delete-action="column">
-                                        <img src="/icons/delcol.svg" alt="" />
-                                        <span>Sütun sil</span>
-                                    </button>
-                                    <button type="button" data-delete-action="sheet">
-                                        <img src="/icons/sheet-delete.svg" alt="" />
-                                        <span>Sayfa sil</span>
-                                    </button>
-                                    <button type="button" data-delete-action="clear">
-                                        <img src="/icons/clear.svg" alt="" />
-                                        <span>Hücre temizle</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <hr>
-                            <button id="menu-find-btn" type="button">
-                                <img src="/icons/search.svg" alt="" />
-                                <span>Bul ve değiştir</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="view-menu-btn" type="button">Görünüm</button>
-                        <div id="view-menu" class="text-menu-popover" hidden>
-                            <button id="menu-view-toolbar-btn" type="button">
-                                <span class="menu-check" aria-hidden="true">✓</span>
-                                <span>Araç çubuğu</span>
-                            </button>
-                            <button id="menu-view-formula-btn" type="button">
-                                <span class="menu-check" aria-hidden="true">✓</span>
-                                <span>Formül çubuğu</span>
-                            </button>
-                            <button id="menu-view-gridlines-btn" type="button">
-                                <span class="menu-check" aria-hidden="true">✓</span>
-                                <span>Kılavuz çizgileri</span>
-                            </button>
-                            <hr>
-                            <button id="menu-freeze-axis-btn" type="button">
-                                <img src="/icons/freeze-pane.svg" alt="" />
-                                <span>Seçili satır/sütunu dondur</span>
-                            </button>
-                            <hr>
-                            <div class="format-submenu-shell">
-                                <button id="menu-zoom-btn" type="button">
-                                    <img src="/icons/zoom-in.svg" alt="" />
-                                    <span>Yakınlaştır</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-zoom-value="50"><span class="menu-check"
-                                            aria-hidden="true"></span><span>50%</span></button>
-                                    <button type="button" data-zoom-value="75"><span class="menu-check"
-                                            aria-hidden="true"></span><span>75%</span></button>
-                                    <button type="button" data-zoom-value="90"><span class="menu-check"
-                                            aria-hidden="true"></span><span>90%</span></button>
-                                    <button type="button" data-zoom-value="100"><span class="menu-check"
-                                            aria-hidden="true"></span><span>100%</span></button>
-                                    <button type="button" data-zoom-value="125"><span class="menu-check"
-                                            aria-hidden="true"></span><span>125%</span></button>
-                                    <button type="button" data-zoom-value="150"><span class="menu-check"
-                                            aria-hidden="true"></span><span>150%</span></button>
-                                    <button type="button" data-zoom-value="200"><span class="menu-check"
-                                            aria-hidden="true"></span><span>200%</span></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="insert-menu-btn" type="button">Ekle</button>
-                        <div id="insert-menu" class="text-menu-popover" hidden>
-                            <div class="format-submenu-shell">
-                                <button id="menu-insert-rows-btn" type="button">
-                                    <img src="/icons/rows.svg" alt="" />
-                                    <span>Satırlar</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-insert-action="row-above">
-                                        <img src="/icons/addrowup.svg" alt="" />
-                                        <span>Üste satır ekle</span>
-                                    </button>
-                                    <button type="button" data-insert-action="row-below">
-                                        <img src="/icons/addrowdown.svg" alt="" />
-                                        <span>Alta satır ekle</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="format-submenu-shell">
-                                <button id="menu-insert-cols-btn" type="button">
-                                    <img src="/icons/cols.svg" alt="" />
-                                    <span>Sütunlar</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-insert-action="col-left">
-                                        <img src="/icons/addcolleft.svg" alt="" />
-                                        <span>Sola sütun ekle</span>
-                                    </button>
-                                    <button type="button" data-insert-action="col-right">
-                                        <img src="/icons/addcolright.svg" alt="" />
-                                        <span>Sağa sütun ekle</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <hr>
-                            <button id="menu-insert-chart-btn" type="button" data-insert-action="chart">
-                                <img src="/icons/addgraph.svg" alt="" />
-                                <span>Grafik</span>
-                            </button>
-                            <hr>
-                            <button id="menu-insert-sheet-btn" type="button" data-insert-action="sheet">
-                                <img src="/icons/sheet-add.svg" alt="" />
-                                <span>Sayfa ekle</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="data-menu-btn" type="button">Veri</button>
-                        <div id="data-menu" class="text-menu-popover" hidden>
-                            <button id="menu-sort-asc-btn" type="button">
-                                <img src="/icons/sort-asc.svg" alt="" />
-                                <span>A-Z Sırala</span>
-                            </button>
-                            <button id="menu-sort-desc-btn" type="button">
-                                <img src="/icons/sort-desc.svg" alt="" />
-                                <span>Z-A Sırala</span>
-                            </button>
-                            <hr>
-                            <button id="menu-filter-btn" type="button" disabled>
-                                <img src="/icons/filter.svg" alt="" />
-                                <span>Filtre oluştur</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="format-menu-btn" type="button">Biçim</button>
-                        <div id="format-menu" class="text-menu-popover" hidden>
-                            <button id="menu-bold-btn" type="button">
-                                <img src="/icons/text-bold.svg" alt="" />
-                                <span>Kalın</span>
-                            </button>
-                            <button id="menu-italic-btn" type="button">
-                                <img src="/icons/text-italic.svg" alt="" />
-                                <span>İtalik</span>
-                            </button>
-                            <button id="menu-underline-btn" type="button">
-                                <img src="/icons/text-underline.svg" alt="" />
-                                <span>Altı çizili</span>
-                            </button>
-                            <button id="menu-strikethrough-btn" type="button">
-                                <img src="/icons/text-strikethrough.svg" alt="" />
-                                <span>Üstü çizili</span>
-                            </button>
-                            <hr>
-                            <button id="menu-font-size-increase-btn" type="button">
-                                <img src="/icons/text-size-increase.svg" alt="" />
-                                <span>Yazı boyutunu artır</span>
-                            </button>
-                            <button id="menu-font-size-decrease-btn" type="button">
-                                <img src="/icons/text-size-decrease.svg" alt="" />
-                                <span>Yazı boyutunu azalt</span>
-                            </button>
-                            <button id="menu-text-color-btn" type="button">
-                                <span class="text-color-icon-shell menu-color-icon">
-                                    <img src="/icons/text-color.svg" alt="" />
-                                    <span class="text-color-indicator-line"></span>
-                                </span>
-                                <span>Yazı rengi</span>
-                            </button>
-                            <button id="menu-fill-color-btn" type="button">
-                                <span class="fill-color-icon-shell menu-color-icon">
-                                    <img src="/icons/fill-color.svg" alt="" />
-                                    <span class="fill-color-indicator-line"></span>
-                                </span>
-                                <span>Dolgu rengi</span>
-                            </button>
-                            <hr>
-                            <div class="format-submenu-shell">
-                                <button id="menu-align-btn" type="button">
-                                    <img src="/icons/align-left.svg" alt="" />
-                                    <span>Hizala</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-format-action="align-left">
-                                        <img src="/icons/align-left.svg" alt="" />
-                                        <span>Sola hizala</span>
-                                    </button>
-                                    <button type="button" data-format-action="align-center">
-                                        <img src="/icons/align-center.svg" alt="" />
-                                        <span>Ortaya hizala</span>
-                                    </button>
-                                    <button type="button" data-format-action="align-right">
-                                        <img src="/icons/align-right.svg" alt="" />
-                                        <span>Sağa hizala</span>
-                                    </button>
-                                    <button type="button" data-format-action="align-justify">
-                                        <img src="/icons/align-justify.svg" alt="" />
-                                        <span>İki yana yasla</span>
-                                    </button>
-                                    <hr>
-                                    <button type="button" data-format-action="align-top">
-                                        <img src="/icons/align-top.svg" alt="" />
-                                        <span>Üste hizala</span>
-                                    </button>
-                                    <button type="button" data-format-action="align-middle">
-                                        <img src="/icons/align-middle.svg" alt="" />
-                                        <span>Dikey ortala</span>
-                                    </button>
-                                    <button type="button" data-format-action="align-bottom">
-                                        <img src="/icons/align-bottom.svg" alt="" />
-                                        <span>Alta hizala</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <hr>
-                            <div class="format-submenu-shell">
-                                <button id="menu-border-btn" type="button">
-                                    <img src="/icons/border-menu.svg" alt="" />
-                                    <span>Kenarlıklar</span>
-                                    <span class="submenu-arrow" aria-hidden="true">›</span>
-                                </button>
-                                <div class="text-menu-popover format-submenu">
-                                    <button type="button" data-border-action="all">
-                                        <img src="/icons/border-all.svg" alt="" />
-                                        <span>Tüm kenarlıklar</span>
-                                    </button>
-                                    <button type="button" data-border-action="outer">
-                                        <img src="/icons/border-outer.svg" alt="" />
-                                        <span>Dış kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="inner">
-                                        <img src="/icons/border-inner.svg" alt="" />
-                                        <span>İç kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="top">
-                                        <img src="/icons/border-top.svg" alt="" />
-                                        <span>Üst kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="bottom">
-                                        <img src="/icons/border-bottom.svg" alt="" />
-                                        <span>Alt kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="left">
-                                        <img src="/icons/border-left.svg" alt="" />
-                                        <span>Sol kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="right">
-                                        <img src="/icons/border-right.svg" alt="" />
-                                        <span>Sağ kenarlık</span>
-                                    </button>
-                                    <button type="button" data-border-action="clear">
-                                        <img src="/icons/border-clear.svg" alt="" />
-                                        <span>Kenarlık yok</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <button id="menu-merge-btn" type="button">
-                                <img src="/icons/merge-cells.svg" alt="" />
-                                <span>Hücreleri birleştir</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="menu-shell">
-                        <button id="help-menu-btn" type="button">Yardım</button>
-                        <div id="help-menu" class="text-menu-popover" hidden>
-                            <button type="button" data-help-action="functions">
-                                <img src="/icons/function.svg" alt="" />
-                                <span>Formüller</span>
-                            </button>
-                            <button type="button" data-help-action="shortcuts">
-                                <img src="/icons/keyboard.svg" alt="" />
-                                <span>Klavye kısayolları</span>
-                            </button>
-                            <hr class="menu-separator" />
-                            <button id="help-about-btn" type="button" data-help-action="about">
-                                <img src="/icons/app-icon.svg" alt="" />
-                                <span>Hakkında</span>
-                            </button>
-                        </div>
-                    </div>
-                </nav>
-                <div class="find-menu-cluster">
-                    <button id="find-toggle-btn" class="icon-btn" title="Arama (Ctrl+F)">
-                        <img src="/icons/search.svg" alt="" />
-                    </button>
-                    <div id="find-panel" hidden>
-                        <input id="find-input" type="search" aria-label="Bul" placeholder="Bul" autocomplete="off" />
-                        <span id="find-count">0/0</span>
-                        <button id="find-prev-btn" class="icon-btn" type="button" title="Önceki">
-                            <span>‹</span>
-                        </button>
-                        <button id="find-next-btn" class="icon-btn" type="button" title="Sonraki">
-                            <span>›</span>
-                        </button>
-                        <input id="replace-input" type="search" aria-label="Değiştir" placeholder="Değiştir"
-                            autocomplete="off" />
-                        <button id="replace-btn" class="find-text-btn" type="button"
-                            title="Geçerli sonucu değiştir">Değiştir</button>
-                        <button id="replace-all-btn" class="find-text-btn" type="button"
-                            title="Tüm sonuçları değiştir">Tümü</button>
-                        <button id="find-close-btn" class="icon-btn" type="button" title="Kapat">
-                            <span>×</span>
-                        </button>
-                    </div>
-                </div>
-            </section>
-
             <section id="control-panel" aria-label="Araç çubuğu">
                 <!--
                     Her .tb-item çubukta bir düğme ya da grup. Sığmayanlar sondan başlayarak ☰ menüsüne
@@ -406,12 +25,32 @@
                     grup penceresinde her zaman görünür (anlamı simgeden çıkmayan düğmeler).
                 -->
                 <div id="toolbar-row" class="toolbar-group">
+                    <div class="tb-item" data-tb-item="new" data-tb-welcome>
+                        <button id="new-file-btn" class="icon-btn" type="button" title="Yeni">
+                            <img src="/icons/new.svg" alt="" /><span class="tb-name">Yeni</span>
+                        </button>
+                    </div>
+                    <div class="tb-item" data-tb-item="open" data-tb-welcome>
+                        <button id="open-file-btn" class="icon-btn" type="button" title="Aç (Ctrl+O)">
+                            <img src="/icons/open.svg" alt="" /><span class="tb-name">Aç</span>
+                        </button>
+                    </div>
+                    <div class="tb-item tb-divider" data-tb-item="save">
+                        <button id="save-file-btn" class="icon-btn" type="button" title="Kaydet (Ctrl+S)">
+                            <img src="/icons/save.svg" alt="" /><span class="tb-name">Kaydet</span>
+                        </button>
+                    </div>
                     <div class="tb-item tb-divider" data-tb-item="history">
                         <button id="undo-btn" class="icon-btn" type="button" title="Geri Al (Ctrl+Z)">
                             <img src="/icons/undo.svg" alt="" /><span class="tb-name">Geri Al</span>
                         </button>
                         <button id="redo-btn" class="icon-btn" type="button" title="Yinele (Ctrl+Y)">
                             <img src="/icons/redo.svg" alt="" /><span class="tb-name">Yinele</span>
+                        </button>
+                    </div>
+                    <div class="tb-item tb-divider" data-tb-item="find">
+                        <button id="find-toggle-btn" class="icon-btn" type="button" title="Bul ve değiştir (Ctrl+F)">
+                            <img src="/icons/search.svg" alt="" /><span class="tb-name">Bul ve değiştir</span>
                         </button>
                     </div>
                     <div class="tb-item tb-divider" data-tb-item="zoom">
@@ -662,12 +301,12 @@
 
                     <div class="tb-item tb-group" data-tb-group="axis">
                         <button id="axis-group-btn" class="icon-btn tb-group-btn" type="button"
-                            title="Satır ve sütun görünümü" aria-haspopup="true" aria-expanded="false"
+                            title="Görünüm" aria-haspopup="true" aria-expanded="false"
                             aria-controls="axis-group-panel">
-                            <img src="/icons/eye.svg" alt="" /><span class="tb-name">Satır/sütun görünümü</span><span
+                            <img src="/icons/eye.svg" alt="" /><span class="tb-name">Görünüm</span><span
                                 class="tb-caret" aria-hidden="true"></span>
                         </button>
-                        <div id="axis-group-panel" class="tb-panel" role="group" aria-label="Satır ve sütun görünümü"
+                        <div id="axis-group-panel" class="tb-panel" role="group" aria-label="Görünüm"
                             hidden>
                             <button id="hide-axis-btn" class="icon-btn tb-labeled" type="button"
                                 title="Seçili satırı/sütunu gizle">
@@ -681,6 +320,14 @@
                                 title="Seçili satırı/sütunu dondur">
                                 <img src="/icons/freeze-pane.svg" alt="" /><span class="tb-label">Dondur</span>
                             </button>
+                            <button id="menu-view-formula-btn" class="icon-btn tb-labeled tb-switch" type="button"
+                                title="Formül çubuğunu göster / gizle">
+                                <span class="menu-check" aria-hidden="true">✓</span><span class="tb-label">Formül çubuğu</span>
+                            </button>
+                            <button id="menu-view-gridlines-btn" class="icon-btn tb-labeled tb-switch" type="button"
+                                title="Kılavuz çizgilerini göster / gizle">
+                                <span class="menu-check" aria-hidden="true">✓</span><span class="tb-label">Kılavuz çizgileri</span>
+                            </button>
                         </div>
                     </div>
 
@@ -689,8 +336,18 @@
                             <img src="/icons/addgraph.svg" alt="" /><span class="tb-name">Grafik ekle</span>
                         </button>
                     </div>
+                    <div class="tb-item tb-divider-left" data-tb-item="save-as">
+                        <button id="save-as-file-btn" class="icon-btn" type="button" title="Farklı kaydet / Dışa aktar (Ctrl+Shift+S)">
+                            <img src="/icons/save-as.svg" alt="" /><span class="tb-name">Farklı kaydet / Dışa aktar</span>
+                        </button>
+                    </div>
+                    <div class="tb-item" data-tb-item="print">
+                        <button id="print-file-btn" class="icon-btn" type="button" title="Yazdır">
+                            <img src="/icons/print.svg" alt="" /><span class="tb-name">Yazdır</span>
+                        </button>
+                    </div>
 
-                    <div class="tb-overflow">
+                    <div class="tb-overflow" data-tb-welcome>
                         <button id="toolbar-menu-btn" class="icon-btn" type="button" title="Menüyü aç"
                             aria-label="Menüyü aç" aria-haspopup="true" aria-expanded="false"
                             aria-controls="toolbar-menu" hidden>
@@ -698,8 +355,51 @@
                         </button>
                     </div>
                 </div>
-                <div id="toolbar-menu" class="tb-menu" role="group" aria-label="Diğer araçlar" hidden></div>
+                <div id="toolbar-menu" class="tb-menu" role="group" aria-label="Diğer araçlar" hidden>
+                    <!-- Hep menünün sonunda (ailenin kuralı: Hakkında en sonda); sığmayanlar bunların önüne gelir. -->
+                    <div class="tb-menu-static" data-tb-welcome>
+                        <div class="tb-item">
+                            <button id="welcome-file-btn" class="icon-btn" type="button" title="Giriş ekranı">
+                                <img src="/icons/app-icon.svg" alt="" /><span class="tb-name">Giriş ekranı</span>
+                            </button>
+                        </div>
+                        <div class="tb-item">
+                            <button class="icon-btn" type="button" data-help-action="functions" title="Formüller">
+                                <img src="/icons/function.svg" alt="" /><span class="tb-name">Formüller</span>
+                            </button>
+                        </div>
+                        <div class="tb-item">
+                            <button class="icon-btn" type="button" data-help-action="shortcuts" title="Klavye kısayolları">
+                                <img src="/icons/keyboard.svg" alt="" /><span class="tb-name">Klavye kısayolları</span>
+                            </button>
+                        </div>
+                        <div class="tb-item">
+                            <button id="help-about-btn" class="icon-btn" type="button" data-help-action="about" title="Hakkında">
+                                <img src="/icons/app-icon.svg" alt="" /><span class="tb-name">Hakkında</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </section>
+            <div id="find-panel" hidden>
+                <input id="find-input" type="search" aria-label="Bul" placeholder="Bul" autocomplete="off" />
+                <span id="find-count">0/0</span>
+                <button id="find-prev-btn" class="icon-btn" type="button" title="Önceki">
+                    <span>‹</span>
+                </button>
+                <button id="find-next-btn" class="icon-btn" type="button" title="Sonraki">
+                    <span>›</span>
+                </button>
+                <input id="replace-input" type="search" aria-label="Değiştir" placeholder="Değiştir"
+                    autocomplete="off" />
+                <button id="replace-btn" class="find-text-btn" type="button"
+                    title="Geçerli sonucu değiştir">Değiştir</button>
+                <button id="replace-all-btn" class="find-text-btn" type="button"
+                    title="Tüm sonuçları değiştir">Tümü</button>
+                <button id="find-close-btn" class="icon-btn" type="button" title="Kapat">
+                    <span>×</span>
+                </button>
+            </div>
         </header>
 
         <section id="formula-bar">
@@ -819,30 +519,36 @@
         <a id="made-signature" href="https://www.madematik.com" target="_blank" rel="noopener noreferrer">
             <span>m</span><span class="made-highlight">ADEM</span><span>atik Solutions</span>
         </a>
-    </main>
-
-    <!-- Giriş ekranı, awPDF'inki gibi (kullanıcı kararı 2026-11-18): yeni tablo, açma, dönüştürmeler. -->
-    <section id="welcome-screen" class="welcome" aria-label="Giriş" hidden>
-        <img src="/icons/app-icon.png" width="128" height="128" alt="awCELL" />
-        <div class="welcome-actions">
-            <button id="welcome-new" class="welcome-primary" type="button">Yeni Tablo</button>
-            <button id="welcome-open" type="button">Tablo Aç</button>
-            <button id="welcome-xlsx-pdf" type="button" aria-label="Excel tablosunu PDF'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> PDF</button>
-            <button id="welcome-csv-xlsx" type="button" aria-label="CSV dosyasını Excel'e dönüştür">CSV <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
-            <button id="welcome-ods-xlsx" type="button" aria-label="LibreOffice tablosunu Excel'e dönüştür">ODS <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
-            <button id="welcome-xlsx-ods" type="button" aria-label="Excel tablosunu LibreOffice'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> ODS</button>
-            <button id="welcome-back" type="button" hidden>Tabloya Dön</button>
-        </div>
-        <div id="welcome-restore" class="welcome-restore" role="status" hidden>
-            <span class="restore-bar-title"></span>
-            <span>Geri yüklemek ister misiniz?</span>
-            <span class="welcome-restore-actions">
-                <button class="restore-bar-restore welcome-primary" type="button">Geri Yükle</button>
-                <button class="restore-bar-dismiss" type="button">Sil</button>
-            </span>
+        <!-- Giriş ekranı, awPDF'inki gibi (kullanıcı kararı 2026-11-18): yeni tablo, açma, dönüştürmeler.
+         Tablonun yerini kaplar (formül çubuğu, tablo, sayfa sekmeleri); araç çubuğu üstte görünür kalır. -->
+        <section id="welcome-screen" class="welcome" aria-label="Giriş" hidden>
+            <img src="/icons/app-icon.png" width="128" height="128" alt="awCELL" />
+            <div class="welcome-actions">
+                <button id="welcome-new" class="welcome-primary" type="button">Yeni Tablo</button>
+                <button id="welcome-open" type="button">Tablo Aç</button>
+                <button id="welcome-xlsx-pdf" type="button" aria-label="Excel tablosunu PDF'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> PDF</button>
+                <button id="welcome-csv-xlsx" type="button" aria-label="CSV dosyasını Excel'e dönüştür">CSV <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
+                <button id="welcome-ods-xlsx" type="button" aria-label="LibreOffice tablosunu Excel'e dönüştür">ODS <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> Excel</button>
+                <button id="welcome-xlsx-ods" type="button" aria-label="Excel tablosunu LibreOffice'e dönüştür">Excel <svg class="welcome-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8h21"/><path d="M17 2.5L24 8l-7 5.5"/></svg> ODS</button>
+                <button id="welcome-back" type="button" hidden>Tabloya Dön</button>
+            </div>
+            <div id="welcome-restore" class="welcome-restore" role="status" hidden>
+                <span class="restore-bar-title"></span>
+                <span>Geri yüklemek ister misiniz?</span>
+                <span class="welcome-restore-actions">
+                    <button class="restore-bar-restore welcome-primary" type="button">Geri Yükle</button>
+                    <button class="restore-bar-dismiss" type="button">Sil</button>
+                </span>
+            </div>
+            <div id="welcome-recent" class="welcome-recent" hidden>
+            <h2>Son Dosyalar</h2>
+            <div id="welcome-recent-list" class="welcome-recent-list"></div>
+            <button id="welcome-recent-clear" type="button">Listeyi Temizle</button>
         </div>
         <label class="welcome-startup"><input id="welcome-at-start" type="checkbox" /> Açılışta bu ekranı göster</label>
-    </section>
+        </section>
+    </main>
+
 
     <input id="open-file-input" class="hidden-file-input" type="file"
         accept=".awc,.xlsx,.xlsm,.ods,.csv,.tsv,.txt,.xls,application/json,text/csv" />

@@ -123,62 +123,25 @@ body.gridlines-hidden {
 #app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: 68px 36px minmax(0, 1fr) 34px;
+  /* The toolbar's one row (the text menus and the logo went on 2026-11-18), formula bar, table, sheet tabs. */
+  grid-template-rows: auto 36px minmax(0, 1fr) 34px;
+  /* One column as wide as the window: the toolbar's row must not stretch it (what does not fit goes into ☰). */
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100vh;
   /* Telefonda 100vh adres çubuğunun arkasını da sayar; dvh görünen yüksekliktir. */
   height: 100dvh;
 }
 
-body.toolbar-hidden #app-shell {
-  grid-template-rows: 30px 36px minmax(0, 1fr) 34px;
-}
-
 body.formula-hidden #app-shell {
-  grid-template-rows: 68px 0 minmax(0, 1fr) 34px;
-}
-
-body.toolbar-hidden.formula-hidden #app-shell {
-  grid-template-rows: 30px 0 minmax(0, 1fr) 34px;
+  grid-template-rows: auto 0 minmax(0, 1fr) 34px;
 }
 
 #top-bar {
+  position: relative;
   grid-row: 1;
-  display: grid;
-  grid-template-rows: 30px 38px;
-  grid-template-columns: 116px minmax(0, 1fr);
   background: var(--toolbar-bg);
   border-bottom: 1px solid #edf0f2;
-}
-
-body.toolbar-hidden #top-bar {
-  grid-template-rows: 30px;
-}
-
-#top-bar > .app-logo {
-  grid-row: 1 / 3;
-  grid-column: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  line-height: 1;
-}
-
-body.toolbar-hidden #top-bar > .app-logo {
-  grid-row: 1;
-}
-
-#top-bar > .app-logo img {
-  display: block;
-  width: 54px;
-  height: 54px;
-}
-
-body.toolbar-hidden #top-bar > .app-logo img {
-  width: 26px;
-  height: 26px;
 }
 
 #menu-bar {
@@ -345,17 +308,11 @@ body.toolbar-hidden #top-bar > .app-logo img {
 }
 
 #control-panel {
-  grid-row: 2;
-  grid-column: 2;
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 3px 12px 5px 0;
+  padding: 4px 8px 5px;
   background: var(--toolbar-bg);
-}
-
-body.toolbar-hidden #control-panel {
-  display: none;
 }
 
 .toolbar-group {
@@ -596,6 +553,38 @@ body.toolbar-hidden #control-panel {
   padding-right: 7px;
   margin-right: 4px;
   border-right: 1px solid #dadce0;
+}
+
+.tb-item.tb-divider-left {
+  padding-left: 7px;
+  margin-left: 4px;
+  border-left: 1px solid #dadce0;
+}
+
+/* Always at the end of the ☰ menu: the welcome screen and help, after a line. */
+.tb-menu-static {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #dadce0;
+}
+
+.tb-menu-static:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Formula bar and gridlines in Görünüm: a check shows whether they are on. */
+.tb-switch .menu-check {
+  width: 20px;
+  font-weight: 700;
+}
+
+/* On the welcome screen the tools that need a table rest. */
+.tb-item[inert] {
+  opacity: 0.38;
 }
 
 .tb-name,
@@ -1020,6 +1009,10 @@ body.formula-hidden #formula-bar {
 }
 
 #find-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 8px;
+  z-index: 60;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2506,43 +2499,9 @@ body.touch-input .freeze-col-divider {
 
 /* === Dar ekran (telefon): üst çubuk ekrana sığar === */
 @media (max-width: 640px) {
-  #top-bar {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-
-  #top-bar > .app-logo img {
-    width: 36px;
-    height: 36px;
-  }
-
-  #menu-bar {
-    gap: 4px;
-    min-width: 0;
+  #control-panel {
     padding-right: 4px;
-  }
-
-  /* Menü adları sığmazsa şerit parmakla kayar; açılan menüler şeridin dışına, düğmenin altına yerleşir
-     (app.js: positionNarrowTextMenu). */
-  .text-menu {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .text-menu::-webkit-scrollbar {
-    display: none;
-  }
-
-  .text-menu > .menu-shell > button {
-    padding: 0 6px;
-    white-space: nowrap;
-  }
-
-  .text-menu > .menu-shell > .text-menu-popover {
-    position: fixed;
-    max-height: calc(100vh - 80px);
-    overflow-y: auto;
+    padding-left: 4px;
   }
 }
 
@@ -2711,9 +2670,11 @@ body.touch-input .freeze-col-divider {
 
 /* === Giriş ekranı: awPDF'in ilk ekranı gibi (kullanıcı kararı 2026-11-18) === */
 .welcome {
-  position: fixed;
-  inset: 0;
-  z-index: 900;
+  position: relative;
+  grid-row: 2 / -1;
+  grid-column: 1;
+  z-index: 50;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2724,10 +2685,6 @@ body.touch-input .freeze-col-divider {
   background: #f1f3f4;
   color: var(--text);
   font-size: 18px;
-}
-
-body.has-custom-titlebar .welcome {
-  top: var(--titlebar-height);
 }
 
 .welcome[hidden],
@@ -2804,6 +2761,56 @@ body.has-custom-titlebar .welcome {
   gap: 8px;
 }
 
+.welcome-recent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(440px, 100%);
+}
+
+.welcome-recent[hidden] {
+  display: none;
+}
+
+.welcome-recent h2 {
+  margin: 8px 0 0;
+  font-size: 18px;
+}
+
+.welcome-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.welcome .welcome-recent-item {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.welcome-recent-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-recent-date {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .welcome-startup {
   display: flex;
   align-items: center;
@@ -2837,5 +2844,24 @@ body.has-custom-titlebar .welcome {
 @media print {
   .welcome {
     display: none !important;
+  }
+}
+
+/* Every part of the shell in its one column: the welcome screen lies over rows 2–4 instead of pushing
+   them aside into a second column. */
+#top-bar,
+#formula-bar,
+#table-area,
+#sheet-tabs {
+  grid-column: 1;
+}
+
+/* A narrow screen: the find panel fits and wraps. */
+@media (max-width: 640px) {
+  #find-panel {
+    left: 8px;
+    flex-wrap: wrap;
+    height: auto;
+    max-width: calc(100vw - 16px);
   }
 }

@@ -17,7 +17,7 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
   ÇOKEĞERSAY, ÇOKETOPLA, DÜŞEYARA, YATAYARA, KAÇINCI, İNDİS, YUVARLA, YUKARIYUVARLA, AŞAĞIYUVARLA,
   TAMSAYI, NSAT, MUTLAK, KAREKÖK, KUVVET, MOD, Pİ, İŞARET, ÜS, LN, LOG, LOG10, UZUNLUK, BÜYÜKHARF,
   KÜÇÜKHARF, YAZIM.DÜZENİ, KIRP, SOLDAN, SAĞDAN, PARÇAAL, BİRLEŞTİR, SAYIYAÇEVİR, BUGÜN, ŞİMDİ,
-  S_SAYI_ÜRET, RASTGELEARADA (ve İngilizce karşılıkları). Liste uygulamada **Yardım → Formüller**'de.
+  S_SAYI_ÜRET, RASTGELEARADA (ve İngilizce karşılıkları). Liste uygulamada **☰ → Formüller**'de.
 - **Hatalar** Türkçe Excel'deki gibi gösterilir: `#SAYI/0!`, `#DEĞER!`, `#AD?`, `#BAŞV!`, `#YOK`;
   döngüsel başvuru uygulamayı kilitlemez, `#DÖNGÜ!` olur.
 - **Ondalık**: `3,5` ve `3.5` ikisi de sayıdır; formül sonuçları virgülle gösterilir.
@@ -34,9 +34,16 @@ dosyalarını açar ve kaydeder; internet kesildiğinde de son açılan sürüm 
 - **Geri al / yinele**: her sayfanın geçmişi ayrı tutulur.
 - **Otomatik kayıt**: tarayıcı deposunda. Sayfa yenilenince çalışma kendiliğinden gelir; sekme
   kapatılıp yeniden açılınca "Son çalışmanız bulundu — Geri yükle" önerilir.
-- **Araç çubuğu**: işler gruplu (Yazı, Hizalama, Kenarlık, Sayı biçimi, Satır, Sütun, Sırala ve süz,
-  Satır/sütun görünümü). Grup düğmesi tıklayınca açılır; Hizalama ve Kenarlık'ta düğmenin büyük kısmı
-  son seçimi tek dokunuşla uygular. Ekran darsa sığmayanlar ☰ menüsüne geçer (açıkken ✕).
+- **Araç çubuğu** (ailenin ortak stili; yazılı menüler ve logo 2026-11-18'de kalktı): Yeni, Aç, Kaydet,
+  Geri al / Yinele, Bul ve değiştir, Yakınlaştırma; işler gruplu (Yazı, Hizalama, Kenarlık, Sayı biçimi,
+  Satır, Sütun, Sırala ve süz, Görünüm: gizle / göster / dondur, formül çubuğu, kılavuz çizgileri); Grafik,
+  Farklı kaydet, Yazdır. Grup düğmesi tıklayınca açılır; Hizalama ve Kenarlık'ta düğmenin büyük kısmı son
+  seçimi tek dokunuşla uygular. Ekran darsa sığmayanlar ☰ menüsüne geçer (açıkken ✕); menünün sonunda hep
+  Giriş ekranı, Formüller, Klavye kısayolları, Hakkında.
+- **Giriş ekranı**: Yeni Tablo, Tablo Aç, dönüştürmeler (Excel → PDF, CSV → Excel, ODS → Excel, Excel → ODS),
+  son dosyalar, son çalışmanın geri yüklenmesi.
+- **Kaydedilmemiş değişiklik**: başka dosya açmadan, Yeni'den ve kapatmadan önce sorulur (Kaydet /
+  Kaydetmeden devam et / Vazgeç).
 - **Yazdırma** (Ctrl+P): etkin sayfa A4'e bölünür; geniş tablolar yatay sayfaya geçer.
 
 ## Dosya biçimleri
@@ -136,13 +143,14 @@ kullanır.
 
 ```
 awCELL/
-├── index.html            # Uygulama kabuğu, menüler, araç çubuğu, iletişim kutusu
+├── index.html            # Uygulama kabuğu, araç çubuğu, giriş ekranı, iletişim kutusu
 ├── src/
 │   ├── app.js            # Arayüz: tablo çizimi, seçim, düzenleme, sayfalar, grafikler (Chart.js)
 │   ├── formula.js        # Formül motoru (belirteç → ayrıştırıcı → değerlendirici), başvuru dönüşümleri
 │   ├── fileio.js         # ZIP, XLSX, ODS, XLS (2003 XML), CSV, PDF; yazdırma sayfaları
 │   ├── desktop.js        # Masaüstü: başlık çubuğu, dosya pencereleri, "Birlikte aç"
 │   ├── android.js        # Android: dosya ekranları, "Birlikte aç", yazdırma, geri tuşu
+│   ├── recent.js         # Son dosyalar (IndexedDB): tarayıcıda tutamaç, masaüstünde kalıcı anahtar, Android'de adres
 │   └── style.css         # Tema ve yerleşim
 ├── public/               # Olduğu gibi kopyalanır: icons/, sw.js, manifest.webmanifest
 ├── android/              # Android projesi (Capacitor); AwCellNativePlugin.java

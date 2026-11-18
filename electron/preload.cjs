@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("awCELLDesktop", {
         showOpen: (filters) => ipcRenderer.invoke("files:show-open", filters),
         showSave: (suggestedName, filters) => ipcRenderer.invoke("files:show-save", suggestedName, filters),
         read: (id) => ipcRenderer.invoke("files:read", id),
+        /** Son dosyalar: dosyanın kalıcı anahtarı ve o anahtarla yeniden açma. */
+        source: (id) => ipcRenderer.invoke("files:source", id),
+        reopen: (key) => ipcRenderer.invoke("files:reopen", key),
         write: (id, data) => ipcRenderer.invoke("files:write", id, data)
     },
     windowControls: {

@@ -335,3 +335,45 @@ mı" diye değil, "tabloda bir şey var mı" diye. Otomatik kayıt da kısa sür
   (`window:save-and-close`); sayfa kaydeder (yer sorulursa ve vazgeçilirse pencere açık kalır), sonra
   pencereyi kapatır. Electron'da geçici profille denendi (Vazgeç pencereyi tutar; Kaydet `.awc`'yi yazar ve
   kapatır). awDOC'ta da aynısı yapıldı.
+
+## Yazılı menüler ve logo kalktı; giriş ekranı awPDF gibi; son dosyalar (2026-11-18, kullanıcı kararı; uygulandı)
+
+Kullanıcı üç uygulamanın giriş ekranlarını karşılaştırdı (awPDF: araç çubuğu görünür, belge gerektirenler
+pasif; awDOC: görünür ama etkin; awCELL: hiç yok) ve eşitlenmesini istedi. Ardından "awCELL den bu menüyü
+kaldıralım aynı zamanda awcelldeki en soldaki awCELL logosunu da kaldıralım ki butonlara yer açılsın. ayrıca
+awCELLe son dosyalar gelsin" dedi.
+- **Yazılı menüler kalktı.** Dosya, Düzenle, Görünüm, Ekle, Veri, Biçim ve Yardım menüleri, sol üstteki logo ve
+  "Araç çubuğunu gizle" seçeneği gitti. Araç çubuğu artık tek satır ve hep görünür; daha önce "gizli" seçilmişse
+  de görünür.
+- **Menüden taşınanlar:**
+  - Yeni, Aç ve Kaydet araç çubuğunun başına geldi.
+  - Bul ve değiştir araç çubuğuna geldi; paneli araç çubuğunun altında, sağda açılır.
+  - Farklı kaydet / Dışa aktar ve Yazdır sona geldi (dar ekranda önce ☰'ye geçerler).
+  - Satır/sütun görünümü grubu "Görünüm ▾" oldu; içine Formül çubuğu ve Kılavuz çizgileri anahtarları
+    eklendi (✓ ile).
+  - ☰'nin sonunda hep Giriş ekranı, Formüller, Klavye kısayolları, Hakkında var (ailenin kuralı: Hakkında en
+    sonda); ☰ düğmesi bu yüzden hep görünür.
+  - Kes, Kopyala, Yapıştır, Temizle, sayfa ekle / sil / yeniden adlandır ve notlar sağ tık menüsünde (önceden
+    de vardı); Biçim ve Veri menülerindekiler zaten araç çubuğundaydı.
+- **Giriş ekranı (awPDF gibi):**
+  - Ekran artık her şeyin üstünü kaplamıyor, yalnız tablonun yerini (formül çubuğu, tablo, sekmeler).
+  - Araç çubuğu üstte görünür kalır. Tablo gerektirenler pasif ve soluk; Yeni, Aç ve ☰ etkin.
+  - Ctrl+N ve Ctrl+O çalışır; öbür tuşlar tabloya gitmez.
+- **Son dosyalar (yeni):** Giriş ekranında, awPDF ve awDOC'taki gibi.
+  - Açılan ve kaydedilen tablolar, en yenisi üstte, en çok 12; yalnız bu cihazda (IndexedDB, `src/recent.js`).
+  - Dokununca dosya yeniden açılır (kaydedilmemiş değişiklik önce sorulur). Bulunamayan ya da izni kalkan dosya
+    söylenir ve listeden çıkar. "Listeyi Temizle" var.
+  - Tarayıcıda (Chromium) dosya tutamacı saklanır.
+  - Masaüstünde kabuk yolu `tablolar.json`'a rastgele bir anahtarla yazar (en çok 100); sayfa yolu görmez.
+  - Android'de seçici ve "kaydet" ekranından gelen dosyalarda kalıcı izin alınır, `reopenFile` izin
+    duruyorsa açar. Yeni Android izni yok; "Birlikte aç" çoğu zaman kalıcı izin vermez, o dosyalar listeye
+    girmez.
+- **Denemeler:**
+  - Chromium'da: son dosyalar (OPFS tutamaçlarıyla) ve pasif araç çubuğu; giriş ekranı ve kaydedilmemiş
+    değişiklik denemeleri yeniden geçti; telefon genişliğinde ☰ ve Bul paneli.
+  - Electron'da geçici profille: kaydedilen dosya uygulama yeniden açılınca son dosyalardan açılıyor;
+    kapatırken Kaydet.
+  - Android Java derleniyor; telefonda denenmedi.
+- **Temizlenecek:** Menülerin açma / kapatma kodu (`openTextMenu`, `hide*Menu`, `updateFormatMenuState`…) ve
+  `.text-menu*` CSS'i artık hiç çalışmıyor. Öğeler olmadığı için sessizce geçiyor, zararsız; ayrı bir
+  temizlik adımında silinebilir.

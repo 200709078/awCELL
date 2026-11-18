@@ -59,6 +59,9 @@ function createHandle(file) {
         name: file.name,
         id: file.id ?? null,
         writable: file.writable === true,
+        /** Son dosyalar için saklanacak adres (izin kalıcıysa). */
+        source: file.source ?? null,
+        awcellSource: () => handle.source,
         async getFile() {
             if (!handle.id) throw new Error("Dosya henüz kaydedilmedi.");
             const { data } = await Native.readFile({ id: handle.id });
@@ -83,12 +86,18 @@ function createHandle(file) {
                     }
                     const saved = await Native.saveFile({ name: handle.name });
                     if (!saved?.id) throw abortError();
-                    Object.assign(handle, { id: saved.id, name: saved.name, writable: true });
+                    Object.assign(handle, { id: saved.id, name: saved.name, writable: true, source: saved.source ?? null });
                 }
             };
         }
     };
     return handle;
+}
+
+/** Son dosyalardan yeniden açma; dosya yoksa ya da izin kalktıysa null. */
+export async function reopenAndroidFile(source) {
+    const file = await Native.reopenFile({ source });
+    return file?.id ? createHandle(file) : null;
 }
 
 function installFilePickers() {

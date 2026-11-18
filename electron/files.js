@@ -2,6 +2,8 @@
 // kullanıcının seçtiği (ya da "Birlikte aç" ile gelen) dosyalara, verilen numarayla okuyup yazar.
 // Dosyanın yolu sayfaya hiç gönderilmez.
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +13,8 @@ export const OPEN_EXTENSIONS = new Set(["awc", "json", "xlsx", "xlsm", "ods", "c
 /** Yazılabilen uzantılar: awCELL'in kaydettiği biçimler. */
 const SAVE_EXTENSIONS = new Set(["awc", "xlsx", "ods", "pdf", "csv", "xls"]);
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
+/** Son dosyalar için hatırlanan yollar (tablolar.json); en eskiler sonra gider. */
+const MAX_SOURCES = 100;
 
 const extensionOf = (filePath) => path.extname(filePath).slice(1).toLowerCase();
 
@@ -32,6 +36,42 @@ export class DesktopFiles {
     #lastId = 0;
     #page = null;
     #waiting = [];
+    /** Kalıcı anahtar → yol. Sayfa yolu görmez; son dosyalar listesinde yalnız anahtarı saklar. */
+    #sources = null;
+
+    #sourcesFile() {
+        return path.join(app.getPath("userData"), "tablolar.json");
+    }
+
+    #loadSources() {
+        if (this.#sources) return this.#sources;
+        this.#sources = new Map();
+        try {
+            const stored = JSON.parse(readFileSync(this.#sourcesFile(), "utf8"));
+            for (const [key, value] of Object.entries(stored)) {
+                if (typeof value === "string") this.#sources.set(key, value);
+            }
+        } catch {
+            // İlk açılış ya da bozuk dosya: liste boş başlar.
+        }
+        return this.#sources;
+    }
+
+    /** Bir yolun kalıcı anahtarı (yoksa yeni); en yeni sona taşınır. */
+    #sourceOf(filePath) {
+        const sources = this.#loadSources();
+        let key = [...sources].find(([, value]) => value === filePath)?.[0];
+        if (key) sources.delete(key);
+        key ??= randomUUID();
+        sources.set(key, filePath);
+        while (sources.size > MAX_SOURCES) sources.delete(sources.keys().next().value);
+        try {
+            writeFileSync(this.#sourcesFile(), JSON.stringify(Object.fromEntries(sources)));
+        } catch {
+            // Yazılamadıysa yalnız bu oturumda hatırlanır.
+        }
+        return key;
+    }
 
     /** Bir yolu kaydeder; sayfaya yalnız numarası ve adı gider. */
     #register(filePath) {
@@ -91,6 +131,24 @@ export class DesktopFiles {
             const allowed = new Set(clean.flatMap((filter) => filter.extensions));
             const target = allowed.has(extensionOf(filePath)) ? filePath : `${filePath}.${defaultExtension}`;
             return this.#register(target);
+        });
+
+        /** Son dosyalar: açılan / kaydedilen dosyanın kalıcı anahtarı. */
+        ipcMain.handle("files:source", (_event, id) => {
+            const filePath = this.#paths.get(id);
+            return filePath ? this.#sourceOf(filePath) : null;
+        });
+
+        /** Son dosyalardan yeniden açma: dosya hâlâ yerindeyse yeni bir numarayla verilir. */
+        ipcMain.handle("files:reopen", async (_event, key) => {
+            const filePath = typeof key === "string" ? this.#loadSources().get(key) : undefined;
+            if (!filePath) return null;
+            try {
+                if (!(await stat(filePath)).isFile()) return null;
+            } catch {
+                return null;
+            }
+            return this.#register(filePath);
         });
 
         ipcMain.handle("files:read", async (_event, id) => {
