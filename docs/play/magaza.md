@@ -69,6 +69,12 @@ awCELL ücretsizdir. Öneri ve sorunlar için: destek@madematik.com
 
 Play Console'da sürüm oluşturulurken `<tr-TR>` ile `</tr-TR>` arasına yazılır. En yenisi üstte.
 
+### 1.1.4
+
+<!-- not-1.1.4 -->
+Yeni giriş ekranı: yeni tablo, dosya açma, dönüştürmeler ve son dosyalar tek yerde. Üstteki yazılı menüler kalktı, araçlar tek satırda. Kaydedilmemiş değişiklik varsa başka dosya açmadan, Yeni'den ve kapatmadan önce sorulur (Vazgeç / Kaydetme / Kaydet). Android geri tuşu adım adım geri gider. Açılamayan dosya için uyarı çıkar.
+<!-- /not-1.1.4 -->
+
 ### 1.1.3
 
 Play'e ilk yüklenen sürüm (2026-11-16); 1.1.1 notu Play'e hiç girmedi.
